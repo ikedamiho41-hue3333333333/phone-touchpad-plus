@@ -27,6 +27,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	mathrand "math/rand"
 	"net"
@@ -37,8 +38,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/unrud/remote-touchpad/inputcontrol"
-	"github.com/unrud/remote-touchpad/terminal"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/inputcontrol"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/internal/buildinfo"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/terminal"
 	"golang.org/x/net/websocket"
 )
 
@@ -48,9 +50,12 @@ const (
 	authenticationRateBurst int           = 10
 	challengeLength         int           = 12
 	defaultBind             string        = ":0"
-	version                 string        = "1.5.5"
-	prettyAppName           string        = "Remote Touchpad"
 )
+
+func writeVersion(w io.Writer) error {
+	_, err := fmt.Fprintln(w, buildinfo.Version)
+	return err
+}
 
 type config struct {
 	UpdateRate       uint    `json:"updateRate"`
@@ -185,7 +190,7 @@ func secureRandBase64(length int) string {
 }
 
 func main() {
-	terminal.SetTitle(prettyAppName)
+	terminal.SetTitle(buildinfo.AppName)
 	var bind, certFile, keyFile, secret string
 	var showVersion bool
 	var config config
@@ -201,7 +206,9 @@ func main() {
 	flag.Float64Var(&config.MouseScrollSpeed, "mouse-scroll-speed", 1, "mouse scroll speed multiplier")
 	flag.Parse()
 	if showVersion {
-		fmt.Println(version)
+		if err := writeVersion(os.Stdout); err != nil {
+			log.Fatal(err)
+		}
 		return
 	}
 	if certFile != "" && keyFile == "" {

@@ -35,6 +35,7 @@ ptp_resolve_paths() {
     PTP_INSTALL_DIR="${prefix}/lib/phone-touchpad-plus"
     PTP_APP="${PTP_INSTALL_DIR}/phone-touchpad-plus"
     PTP_QR_HELPER="${PTP_INSTALL_DIR}/phone-touchpad-plus-makeqr"
+    PTP_PROBE="${PTP_INSTALL_DIR}/phone-touchpad-plus-probe"
     PTP_RUNNER="${PTP_INSTALL_DIR}/run-service.sh"
     PTP_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/phone-touchpad-plus"
     PTP_SECRET_FILE="${PTP_CONFIG_DIR}/secret"
@@ -63,6 +64,15 @@ ptp_atomic_install() {
 
 ptp_sed_replacement() {
     printf '%s' "$1" | sed 's/[\\&|]/\\&/g'
+}
+
+ptp_redact_line() {
+    local line=$1
+    local secret=${2:-}
+    if [[ -n "${secret}" ]]; then
+        line=${line//"${secret}"/***}
+    fi
+    printf '%s\n' "${line}" | sed -E 's|#[^[:space:]]*|#***|g'
 }
 
 ptp_find_xauthority() {

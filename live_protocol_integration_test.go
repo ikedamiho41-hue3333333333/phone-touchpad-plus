@@ -3,9 +3,6 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -13,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/internal/protocol"
 	"golang.org/x/net/websocket"
 )
 
@@ -52,9 +50,7 @@ func TestLiveProtocol(t *testing.T) {
 	if err := websocket.Message.Receive(ws, &challenge); err != nil {
 		t.Fatal(err)
 	}
-	mac := hmac.New(sha256.New, []byte(challenge))
-	mac.Write([]byte(secret))
-	answer := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	answer := protocol.ChallengeResponse(challenge, secret)
 	if err := websocket.Message.Send(ws, answer); err != nil {
 		t.Fatal(err)
 	}

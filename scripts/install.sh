@@ -89,6 +89,7 @@ trap cleanup_stage EXIT INT TERM
 
 stage_app="${stage_dir}/phone-touchpad-plus"
 stage_qr_helper="${stage_dir}/phone-touchpad-plus-makeqr"
+stage_probe="${stage_dir}/phone-touchpad-plus-probe"
 stage_runner="${stage_dir}/run-service.sh"
 stage_secret="${stage_dir}/secret"
 stage_settings="${stage_dir}/settings.env"
@@ -98,7 +99,9 @@ stage_qr="${stage_dir}/pairing.png"
 cd "${repo_root}"
 "${go_command}" build -tags=x11 -trimpath -o "${stage_app}" .
 "${go_command}" build -trimpath -o "${stage_qr_helper}" ./tools/makeqr
+"${go_command}" build -trimpath -o "${stage_probe}" ./tools/probe
 [[ "$("${stage_app}" -version)" == 0.1.0 ]] || { ptp_die 'staged application version check failed'; exit 1; }
+"${stage_probe}" -help >/dev/null 2>&1 || { ptp_die 'staged probe validation failed'; exit 1; }
 if "${stage_qr_helper}" </dev/null >/dev/null 2>&1; then
     ptp_die 'staged QR helper accepted missing input'
     exit 1
@@ -130,6 +133,7 @@ install -d -m 0700 "${PTP_CONFIG_DIR}" "${PTP_DATA_DIR}"
 install -d -m 0755 "${PTP_SYSTEMD_DIR}"
 ptp_atomic_install "${stage_app}" "${PTP_APP}" 0755
 ptp_atomic_install "${stage_qr_helper}" "${PTP_QR_HELPER}" 0755
+ptp_atomic_install "${stage_probe}" "${PTP_PROBE}" 0755
 ptp_atomic_install "${stage_runner}" "${PTP_RUNNER}" 0755
 ptp_atomic_install "${stage_secret}" "${PTP_SECRET_FILE}" 0600
 ptp_atomic_install "${stage_settings}" "${PTP_SETTINGS_FILE}" 0600

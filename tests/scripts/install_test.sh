@@ -50,6 +50,8 @@ make_mocks() {
         'done' \
         'if [[ "${target}" == ./tools/makeqr ]]; then' \
         '  printf "%s\\n" "#!/usr/bin/env bash" "set -euo pipefail" "output=\$1" "IFS= read -r url" "printf %s \"\$url\" >\"\$output\"" >"${output}"' \
+        'elif [[ "${target}" == ./tools/probe ]]; then' \
+        '  printf "%s\\n" "#!/usr/bin/env bash" "if [[ \"\${1:-}\" == -help ]]; then exit 0; fi" "exit 2" >"${output}"' \
         'else' \
         '  version=0.1.0' \
         '  [[ "${PTP_MOCK_BAD_VERSION:-0}" == 1 ]] && version=9.9.9' \
@@ -96,6 +98,7 @@ run_install "${install_root}" >"${install_root}/output"
 
 app="${install_root}/prefix/lib/phone-touchpad-plus/phone-touchpad-plus"
 qr_helper="${install_root}/prefix/lib/phone-touchpad-plus/phone-touchpad-plus-makeqr"
+probe="${install_root}/prefix/lib/phone-touchpad-plus/phone-touchpad-plus-probe"
 runner="${install_root}/prefix/lib/phone-touchpad-plus/run-service.sh"
 config_dir="${install_root}/config/phone-touchpad-plus"
 secret_file="${config_dir}/secret"
@@ -103,7 +106,7 @@ settings_file="${config_dir}/settings.env"
 unit="${install_root}/config/systemd/user/phone-touchpad-plus.service"
 qr_file="${install_root}/data/phone-touchpad-plus/pairing.png"
 
-for file in "${app}" "${qr_helper}" "${runner}" "${secret_file}" "${settings_file}" "${unit}" "${qr_file}"; do
+for file in "${app}" "${qr_helper}" "${probe}" "${runner}" "${secret_file}" "${settings_file}" "${unit}" "${qr_file}"; do
     assert_file "${file}"
 done
 assert_mode "${config_dir}" 700

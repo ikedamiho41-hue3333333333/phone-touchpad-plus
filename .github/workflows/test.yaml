@@ -84,6 +84,10 @@ jobs:
         run: shellcheck scripts/*.sh scripts/lib/*.sh tests/*.sh tests/scripts/*.sh
       - name: Isolated install lifecycle
         run: bash tests/scripts/install_test.sh
+      - name: Read-only doctor lifecycle
+        run: bash tests/scripts/doctor_test.sh
+      - name: Conservative uninstall lifecycle
+        run: bash tests/scripts/uninstall_test.sh
       - name: Live protocol test
         run: bash tests/run-live-protocol.sh
       - name: Repository privacy and attribution

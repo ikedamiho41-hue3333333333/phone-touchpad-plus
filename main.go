@@ -20,9 +20,7 @@
 package main
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"flag"
@@ -40,6 +38,7 @@ import (
 
 	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/inputcontrol"
 	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/internal/buildinfo"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/internal/protocol"
 	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/terminal"
 	"golang.org/x/net/websocket"
 )
@@ -181,11 +180,9 @@ func authenticationChallengeGenerator(secret string, challenges chan<- challenge
 			log.Fatal(err)
 		}
 		message := base64.StdEncoding.EncodeToString(b[:])
-		mac := hmac.New(sha256.New, []byte(message))
-		mac.Write([]byte(secret))
 		challenges <- challenge{
 			message:          message,
-			expectedResponse: base64.StdEncoding.EncodeToString(mac.Sum(nil)),
+			expectedResponse: protocol.ChallengeResponse(message, secret),
 		}
 		time.Sleep(authenticationRateLimit)
 	}

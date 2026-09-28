@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+readonly repo_root
 cd "${repo_root}"
 
 if [[ "${1:-}" == "--self-test" ]]; then

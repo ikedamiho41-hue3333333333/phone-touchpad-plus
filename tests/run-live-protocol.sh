@@ -2,7 +2,8 @@
 set -euo pipefail
 
 readonly test_port=18765
-readonly repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+readonly repo_root
 readonly go_command=${1:-go}
 test_dir=""
 server_pid=""

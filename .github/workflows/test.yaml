@@ -81,7 +81,9 @@ jobs:
       - name: JavaScript behavior tests
         run: node --test tests/*.test.mjs
       - name: Shell checks
-        run: shellcheck tests/*.sh
+        run: shellcheck scripts/*.sh scripts/lib/*.sh tests/*.sh tests/scripts/*.sh
+      - name: Isolated install lifecycle
+        run: bash tests/scripts/install_test.sh
       - name: Live protocol test
         run: bash tests/run-live-protocol.sh
       - name: Repository privacy and attribution

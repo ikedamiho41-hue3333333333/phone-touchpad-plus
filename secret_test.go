@@ -72,7 +72,7 @@ func TestGenerateSecretReadsExactByteCount(t *testing.T) {
 }
 
 func TestPairingOutputDisabledWritesNothing(t *testing.T) {
-	const pairingURL = "http://phone-touchpad-plus.local:8765/#do-not-print-this-secret"
+	const pairingURL = "http://phone-touchpad-plus.local:8765/#do-not-print-this-secret" // TEST-FIXTURE
 	var output bytes.Buffer
 	if err := maybeWritePairingOutput(&output, pairingURL, false, false); err != nil {
 		t.Fatal(err)

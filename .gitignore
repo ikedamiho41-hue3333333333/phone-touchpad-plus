@@ -1,1 +1,14 @@
 .worktrees/
+.superpowers/
+.DS_Store
+.idea/
+.vscode/
+coverage.*
+*.test
+*.test.exe
+/phone-touchpad-plus
+/tmp/
+*.secret
+settings.env
+pairing*.png
+qr-code*.png

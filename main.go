@@ -181,22 +181,16 @@ func authenticationChallengeGenerator(secret string, challenges chan<- challenge
 	}
 }
 
-func secureRandBase64(length int) string {
-	b := make([]byte, length)
-	if _, err := rand.Read(b[:]); err != nil {
-		log.Fatal(err)
-	}
-	return base64.StdEncoding.EncodeToString(b[:])
-}
-
 func main() {
 	terminal.SetTitle(buildinfo.AppName)
-	var bind, certFile, keyFile, secret string
-	var showVersion bool
+	var bind, certFile, keyFile, secret, secretFile string
+	var showVersion, showPairing bool
 	var config config
 	flag.BoolVar(&showVersion, "version", false, "show program's version number and exit")
 	flag.StringVar(&bind, "bind", defaultBind, "bind server to [HOSTNAME]:PORT")
 	flag.StringVar(&secret, "secret", "", "shared secret for client authentication")
+	flag.StringVar(&secretFile, "secret-file", "", "file containing the shared secret")
+	flag.BoolVar(&showPairing, "show-pairing", true, "print pairing URL and QR code")
 	flag.StringVar(&certFile, "cert", "", "file containing TLS certificate")
 	flag.StringVar(&keyFile, "key", "", "file containing TLS private key")
 	flag.UintVar(&config.UpdateRate, "update-rate", 30, "number of updates per second")
@@ -218,8 +212,16 @@ func main() {
 		log.Fatal("TLS certificate file missing")
 	}
 	tls := certFile != "" && keyFile != ""
+	var err error
+	secret, err = resolveSecret(secret, secretFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if secret == "" {
-		secret = secureRandBase64(defaultSecretLength)
+		secret, err = generateSecret(rand.Reader, defaultSecretLength)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	if len(inputcontrol.Controllers) == 0 {
 		log.Fatal("compiled without controller")
@@ -300,10 +302,9 @@ func main() {
 		scheme = "https"
 	}
 	url := fmt.Sprintf("%s://%s/#%s", scheme, domain, secret)
-	fmt.Println(url)
-	if qrCode, err := terminal.GenerateQRCode(url, terminal.SupportsColor(os.Stdout.Fd())); err == nil {
-		fmt.Print(qrCode)
-	} else {
+	if err := maybeWritePairingOutput(
+		os.Stdout, url, terminal.SupportsColor(os.Stdout.Fd()), showPairing,
+	); err != nil {
 		log.Printf("QR code error: %v", err)
 	}
 	if !tls {

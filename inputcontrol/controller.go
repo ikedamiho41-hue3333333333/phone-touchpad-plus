@@ -24,6 +24,7 @@ import "sort"
 type (
 	PointerButton int
 	Key           int
+	GestureAction int
 )
 
 const (
@@ -53,6 +54,16 @@ const (
 	KeyDelete
 	KeyReturn
 	KeyLimit
+)
+
+const (
+	GestureOverview GestureAction = iota
+	GestureShowDesktop
+	GestureAppPrevious
+	GestureAppNext
+	GestureZoomIn
+	GestureZoomOut
+	GestureLimit
 )
 
 type ControllerInfo struct {
@@ -90,4 +101,8 @@ type Controller interface {
 	PointerButton(button PointerButton, press bool) error
 	PointerMove(deltaX, deltaY int) error
 	PointerScroll(deltaHorizontal, deltaVertical int, finish bool) error
+}
+
+type GestureController interface {
+	Gesture(action GestureAction) error
 }

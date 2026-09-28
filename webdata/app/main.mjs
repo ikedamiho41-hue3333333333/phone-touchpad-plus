@@ -48,13 +48,14 @@ window.addEventListener("hashchange", () => {
 window.app = {
     key: inputController.keyboardKey.bind(inputController),
     text: inputController.keyboardText.bind(inputController),
+    gesture: inputController.gesture.bind(inputController),
     toggleFullscreen: ui.toggleFullscreen.bind(ui),
     showTextInput: ui.showTextInput.bind(ui),
     showKeys: ui.showKeys.bind(ui),
     setKeysPage: ui.setKeysPage.bind(ui),
 };
 for (const name in inputcontrollerModule) {
-    if (name.startsWith("KEY_")) {
+    if (name.startsWith("KEY_") || name.startsWith("GESTURE_")) {
         window.app[name] = inputcontrollerModule[name];
     }
 }

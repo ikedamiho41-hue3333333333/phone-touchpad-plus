@@ -1,27 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, interactive-widget=resizes-content">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="手机妙控板">
+<meta name="theme-color" content="#111827">
 <script src="app/main.mjs" type="module"></script>
-<title>Remote Touchpad</title>
+<title>手机妙控板</title>
 <link href="main.css" media="screen" rel="stylesheet">
 <link href="icon.png" type="image/png" rel="icon">
 
 <div id="opening" class="scene">
-    <noscript><p>JavaScript is required!</p></noscript>
-    <p>Connecting…</p>
+    <noscript><p>需要启用 JavaScript</p></noscript>
+    <p>正在连接电脑…</p>
 </div>
 
 <div id="closed" class="scene">
-    <p>Disconnected</p>
+    <p>连接已断开</p>
     <button class="large" onclick="location.reload()">↻</button>
 </div>
 
 <div id="pad" class="scene touch-input mouse-input keyboard-input allow-fullscreen">
-    <p class="background">Touchpad</p>
+    <div class="pad-copy">
+        <p class="background">手机妙控板</p>
+        <p class="gesture-guide">一指移动 · 双指滚动/捏合<br>三指或四指左右滑动切换应用</p>
+    </div>
+    <div id="gesture-status" aria-live="polite"></div>
     <button class="top left" onclick="app.showKeys()">≡</button>
     <button class="bottom left visible-if-fullscreen-enabled" onclick="app.toggleFullscreen()">⤢</button>
     <button class="bottom right" onclick="app.showTextInput()">⌨</button>
+    <div class="gesture-dock" aria-label="手势快捷操作">
+        <button class="gesture-button" onclick="app.gesture(app.GESTURE_APP_PREVIOUS)" aria-label="上一个应用">◀</button>
+        <button class="gesture-button" onclick="app.gesture(app.GESTURE_OVERVIEW)" aria-label="活动概览">⌃</button>
+        <button class="gesture-button" onclick="app.gesture(app.GESTURE_SHOW_DESKTOP)" aria-label="显示桌面">⌄</button>
+        <button class="gesture-button" onclick="app.gesture(app.GESTURE_APP_NEXT)" aria-label="下一个应用">▶</button>
+    </div>
 </div>
 
 <div id="text-input" class="scene">
@@ -96,5 +110,5 @@
 </div>
 
 <div id="mouse" class="scene keyboard-input allow-fullscreen">
-    <p class="background">Mouse</p>
+    <p class="background">鼠标模式</p>
 </div>

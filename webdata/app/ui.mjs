@@ -36,6 +36,7 @@ const textInputScene = document.getElementById("text-input");
 const textInput = textInputScene.querySelector("textarea");
 const mouseScene = document.getElementById("mouse");
 const sendText = document.getElementById("send-text");
+const gestureStatus = document.getElementById("gesture-status");
 
 export default class UI {
     #activeScene = null;
@@ -47,6 +48,7 @@ export default class UI {
     #mouse;
     #keyboard;
     #touchpad;
+    #gestureStatusTimeout = null;
 
     constructor(inputController) {
         this.#inputController = inputController;
@@ -57,6 +59,7 @@ export default class UI {
             (target) => target.classList.contains("touch-input"));
         document.addEventListener("mousedown", this.#handleMousedown.bind(this));
         document.addEventListener("touchend", this.#handleTouchend.bind(this));
+        document.addEventListener("gesturefeedback", this.#handleGestureFeedback.bind(this));
         textInput.addEventListener("input", () => { this.#updateTextInput(); });
         sendText.addEventListener("click", this.#handleSendText.bind(this));
         window.addEventListener("popstate", () => { this.#update(); });
@@ -67,6 +70,18 @@ export default class UI {
             button.addEventListener("click", this.#handleButtonClick.bind(this));
         }
         this.#update();
+    }
+
+    #handleGestureFeedback(event) {
+        gestureStatus.textContent = event.detail;
+        gestureStatus.classList.add("visible");
+        if (this.#gestureStatusTimeout != null) {
+            clearTimeout(this.#gestureStatusTimeout);
+        }
+        this.#gestureStatusTimeout = setTimeout(() => {
+            gestureStatus.classList.remove("visible");
+            this.#gestureStatusTimeout = null;
+        }, 850);
     }
 
    configure(config) {

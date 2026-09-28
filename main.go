@@ -67,6 +67,7 @@ const (
 	commandPointerScrollFinished   byte = 'S'
 	commandPointerMove             byte = 'm'
 	commandPointerButton           byte = 'b'
+	commandGesture                 byte = 'g'
 )
 
 func processCommand(controller inputcontrol.Controller, commandWithArg string) error {
@@ -103,6 +104,19 @@ func processCommand(controller inputcontrol.Controller, commandWithArg string) e
 			return errors.New("unsupported key")
 		}
 		return controller.KeyboardKey(key)
+	case commandGesture:
+		var action inputcontrol.GestureAction
+		if err := parseInts(arg, (*int)(&action)); err != nil {
+			return err
+		}
+		if action < 0 || action >= inputcontrol.GestureLimit {
+			return errors.New("unsupported gesture")
+		}
+		gestureController, ok := controller.(inputcontrol.GestureController)
+		if !ok {
+			return errors.New("gesture actions unsupported by controller")
+		}
+		return gestureController.Gesture(action)
 	case commandPointerScrollInProgress, commandPointerScrollFinished, commandPointerMove:
 		var x, y int
 		if len(arg) != 0 {

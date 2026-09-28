@@ -40,12 +40,20 @@ export const KEY_BACK_SPACE = 15;
 export const KEY_DELETE = 16;
 export const KEY_RETURN = 17;
 
+export const GESTURE_OVERVIEW = 0;
+export const GESTURE_SHOW_DESKTOP = 1;
+export const GESTURE_APP_PREVIOUS = 2;
+export const GESTURE_APP_NEXT = 3;
+export const GESTURE_ZOOM_IN = 4;
+export const GESTURE_ZOOM_OUT = 5;
+
 const COMMAND_KEYBOARD_TEXT = "t";
 const COMMAND_KEYBOARD_KEY = "k";
 const COMMAND_POINTER_SCROLL_IN_PROGRESS = "s";
 const COMMAND_POINTER_SCROLL_FINISHED = "S";
 const COMMAND_POINTER_MOVE = "m";
 const COMMAND_POINTER_BUTTON = "b";
+const COMMAND_GESTURE = "g";
 
 export default class InputController {
     #updateRate = 0;
@@ -128,5 +136,9 @@ export default class InputController {
 
     keyboardText(text) {
         this.#socket.send(`${COMMAND_KEYBOARD_TEXT}${text}`);
+    }
+
+    gesture(action) {
+        this.#socket.send(`${COMMAND_GESTURE}${action}`);
     }
 }

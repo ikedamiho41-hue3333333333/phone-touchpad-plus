@@ -57,6 +57,7 @@ const COMMAND_GESTURE = "g";
 
 export default class InputController {
     #updateRate = 0;
+    #gesturesEnabled = false;
 
     #moveXSum = 0;
     #moveYSum = 0;
@@ -73,6 +74,7 @@ export default class InputController {
 
     configure(config) {
         this.#updateRate = config.updateRate;
+        this.#gesturesEnabled = config.capabilities?.gestures === true;
     }
 
     #startUpdate(fromTimeout = false) {
@@ -139,6 +141,10 @@ export default class InputController {
     }
 
     gesture(action) {
+        if (!this.#gesturesEnabled) {
+            return false;
+        }
         this.#socket.send(`${COMMAND_GESTURE}${action}`);
+        return true;
     }
 }

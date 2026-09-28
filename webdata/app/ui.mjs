@@ -20,6 +20,7 @@
 import Keyboard from "./keyboard.mjs";
 import Mouse from "./mouse.mjs";
 import Touchpad from "./touchpad.mjs";
+import {applyGestureCapability} from "./capabilities.mjs";
 import * as compat from "./compat.mjs";
 
 const IGNORE_CLICK_AFTER_TOUCH_DURATION = 1000; // milliseconds
@@ -85,6 +86,7 @@ export default class UI {
     }
 
    configure(config) {
+        applyGestureCapability(config, document.querySelectorAll(".gesture-capability"));
         this.#mouse.configure(config);
         this.#keyboard.configure(config);
         this.#touchpad.configure(config);

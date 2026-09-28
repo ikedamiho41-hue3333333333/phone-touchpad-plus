@@ -197,18 +197,22 @@ export default class Touchpad {
         }
         if (Math.abs(dx) > Math.abs(dy)) {
             if (dx < 0) {
-                this.#inputController.gesture(GESTURE_APP_NEXT);
-                this.#feedback("下一个应用");
+                if (this.#inputController.gesture(GESTURE_APP_NEXT)) {
+                    this.#feedback("下一个应用");
+                }
             } else {
-                this.#inputController.gesture(GESTURE_APP_PREVIOUS);
-                this.#feedback("上一个应用");
+                if (this.#inputController.gesture(GESTURE_APP_PREVIOUS)) {
+                    this.#feedback("上一个应用");
+                }
             }
         } else if (dy < 0) {
-            this.#inputController.gesture(GESTURE_OVERVIEW);
-            this.#feedback("活动概览");
+            if (this.#inputController.gesture(GESTURE_OVERVIEW)) {
+                this.#feedback("活动概览");
+            }
         } else {
-            this.#inputController.gesture(GESTURE_SHOW_DESKTOP);
-            this.#feedback("显示桌面");
+            if (this.#inputController.gesture(GESTURE_SHOW_DESKTOP)) {
+                this.#feedback("显示桌面");
+            }
         }
         return true;
     }
@@ -399,10 +403,12 @@ export default class Touchpad {
                     this.#pinchAccumulator += distance - this.#pinchLastDistance;
                     while (Math.abs(this.#pinchAccumulator) >= PINCH_STEP) {
                         const zoomIn = this.#pinchAccumulator > 0;
-                        this.#inputController.gesture(
+                        const sent = this.#inputController.gesture(
                             zoomIn ? GESTURE_ZOOM_IN : GESTURE_ZOOM_OUT);
                         this.#pinchAccumulator += zoomIn ? -PINCH_STEP : PINCH_STEP;
-                        this.#feedback(zoomIn ? "放大" : "缩小");
+                        if (sent) {
+                            this.#feedback(zoomIn ? "放大" : "缩小");
+                        }
                     }
                 } else if (this.#twoFingerMode == "scroll") {
                     this.#inputController.pointerScroll(

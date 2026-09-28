@@ -70,6 +70,9 @@ func TestLiveProtocol(t *testing.T) {
 	if receivedConfig.UpdateRate != 30 {
 		t.Fatalf("unexpected update rate: %d", receivedConfig.UpdateRate)
 	}
+	if !receivedConfig.Capabilities.Gestures {
+		t.Fatal("null controller did not advertise gesture capability")
+	}
 
 	for action := 0; action < int(inputGestureLimitForTest); action++ {
 		if err := websocket.Message.Send(ws, "g"+string(rune('0'+action))); err != nil {

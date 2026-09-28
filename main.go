@@ -58,11 +58,21 @@ func writeVersion(w io.Writer) error {
 }
 
 type config struct {
-	UpdateRate       uint    `json:"updateRate"`
-	ScrollSpeed      float64 `json:"scrollSpeed"`
-	MoveSpeed        float64 `json:"moveSpeed"`
-	MouseScrollSpeed float64 `json:"mouseScrollSpeed"`
-	MouseMoveSpeed   float64 `json:"mouseMoveSpeed"`
+	UpdateRate       uint         `json:"updateRate"`
+	ScrollSpeed      float64      `json:"scrollSpeed"`
+	MoveSpeed        float64      `json:"moveSpeed"`
+	MouseScrollSpeed float64      `json:"mouseScrollSpeed"`
+	MouseMoveSpeed   float64      `json:"mouseMoveSpeed"`
+	Capabilities     capabilities `json:"capabilities"`
+}
+
+type capabilities struct {
+	Gestures bool `json:"gestures"`
+}
+
+func controllerCapabilities(controller inputcontrol.Controller) capabilities {
+	_, gestures := controller.(inputcontrol.GestureController)
+	return capabilities{Gestures: gestures}
 }
 
 const (
@@ -259,6 +269,7 @@ func main() {
 		log.Fatal(fmt.Errorf("unsupported platform:\n%w", errors.Join(platformErrs...)))
 	}
 	defer controller.Close()
+	config.Capabilities = controllerCapabilities(controller)
 	authenticationChallenges := make(chan challenge, authenticationRateBurst)
 	go authenticationChallengeGenerator(secret, authenticationChallenges)
 	listener, err := net.Listen("tcp", bind)

@@ -113,6 +113,47 @@ for file in "${repository_files[@]}"; do
     fi
 done
 
+require_documentation() {
+    local file=$1
+    local pattern=$2
+    local label=$3
+    if [[ ! -f "${file}" ]] || ! rg --ignore-case --quiet "${pattern}" "${file}"; then
+        printf '%s is missing from %s\n' "${label}" "${file}" >&2
+        failed=true
+    fi
+}
+
+for readme in README.md README.zh-CN.md; do
+    require_documentation "${readme}" 'Phone Touchpad Plus' 'product name'
+    require_documentation "${readme}" 'v0\.1\.0' 'release version'
+    require_documentation "${readme}" 'Unrud/remote-touchpad.*(v?1\.5\.5|1\.5\.5)' 'upstream version attribution'
+    require_documentation "${readme}" 'GPL-3\.0-or-later' 'license identifier'
+    require_documentation "${readme}" '(trusted (local network|LAN)|可信局域网)' 'trusted-LAN restriction'
+    require_documentation "${readme}" '(no TLS|without TLS|不提供 TLS|没有 TLS)' 'no-TLS warning'
+    require_documentation "${readme}" 'Ubuntu 24\.04.*GNOME X11' 'validated platform'
+    require_documentation "${readme}" '(Windows|macOS|Wayland).*(enhanced gestures|增强手势)' 'unsupported enhanced-gesture scope'
+    require_documentation "${readme}" 'scripts/install\.sh' 'install command'
+    require_documentation "${readme}" 'scripts/doctor\.sh' 'doctor command'
+    require_documentation "${readme}" 'scripts/install\.sh.*--upgrade' 'upgrade command'
+    require_documentation "${readme}" 'scripts/uninstall\.sh' 'uninstall command'
+    require_documentation "${readme}" 'skills/phone-touchpad-plus' 'Skill installation path'
+done
+
+for document in README.md README.zh-CN.md CUSTOMIZATION.md; do
+    while IFS= read -r markdown_match; do
+        link=${markdown_match#](}
+        link=${link%)}
+        case "${link}" in
+            http://*|https://*|'#'*) continue ;;
+        esac
+        link=${link%%#*}
+        if [[ -n "${link}" && ! -e "$(dirname "${document}")/${link}" ]]; then
+            printf 'broken local link in %s: %s\n' "${document}" "${link}" >&2
+            failed=true
+        fi
+    done < <(rg --only-matching '\]\([^)]+\)' "${document}" || true)
+done
+
 [[ -f COPYING ]] || { printf 'COPYING is missing\n' >&2; failed=true; }
 if ! rg --quiet 'Unrud/remote-touchpad' README.md CUSTOMIZATION.md; then
     printf 'upstream attribution is missing\n' >&2

@@ -92,5 +92,5 @@ jobs:
         run: bash tests/skill_test.sh
       - name: Live protocol test
         run: bash tests/run-live-protocol.sh
-      - name: Repository privacy and attribution
+      - name: Repository privacy, documentation, and attribution
         run: bash tests/check-repository.sh --self-test

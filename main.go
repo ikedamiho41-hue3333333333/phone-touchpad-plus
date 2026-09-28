@@ -184,9 +184,10 @@ func authenticationChallengeGenerator(secret string, challenges chan<- challenge
 func main() {
 	terminal.SetTitle(buildinfo.AppName)
 	var bind, certFile, keyFile, secret, secretFile string
-	var showVersion, showPairing bool
+	var showVersion, showPairing, printHosts bool
 	var config config
 	flag.BoolVar(&showVersion, "version", false, "show program's version number and exit")
+	flag.BoolVar(&printHosts, "print-hosts", false, "print phone-reachable host names and exit")
 	flag.StringVar(&bind, "bind", defaultBind, "bind server to [HOSTNAME]:PORT")
 	flag.StringVar(&secret, "secret", "", "shared secret for client authentication")
 	flag.StringVar(&secretFile, "secret-file", "", "file containing the shared secret")
@@ -201,6 +202,16 @@ func main() {
 	flag.Parse()
 	if showVersion {
 		if err := writeVersion(os.Stdout); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if printHosts {
+		primary, alternatives, err := findDefaultHosts()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := writeHosts(os.Stdout, primary, alternatives); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -256,6 +267,7 @@ func main() {
 	}
 	addr := listener.Addr().(*net.TCPAddr)
 	host := ""
+	var alternativeHosts []string
 	bindHost, _, err := net.SplitHostPort(bind)
 	if err != nil {
 		log.Fatal(err)
@@ -267,7 +279,10 @@ func main() {
 		}
 	}
 	if host == "" {
-		host = findDefaultHost()
+		host, alternativeHosts, err = findDefaultHosts()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	port := addr.Port
 	mux := http.NewServeMux()
@@ -306,6 +321,11 @@ func main() {
 		os.Stdout, url, terminal.SupportsColor(os.Stdout.Fd()), showPairing,
 	); err != nil {
 		log.Printf("QR code error: %v", err)
+	}
+	if showPairing {
+		for _, alternativeHost := range alternativeHosts {
+			fmt.Printf("Alternative host: %s\n", alternativeHost)
+		}
 	}
 	if !tls {
 		fmt.Println("▌   WARNING: TLS is not enabled    ▐")

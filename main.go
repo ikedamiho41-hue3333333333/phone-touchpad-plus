@@ -20,13 +20,12 @@
 package main
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	mathrand "math/rand"
 	"net"
@@ -37,8 +36,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/unrud/remote-touchpad/inputcontrol"
-	"github.com/unrud/remote-touchpad/terminal"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/inputcontrol"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/internal/buildinfo"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/internal/protocol"
+	"github.com/ikedamiho41-hue3333333333/phone-touchpad-plus/terminal"
 	"golang.org/x/net/websocket"
 )
 
@@ -48,16 +49,29 @@ const (
 	authenticationRateBurst int           = 10
 	challengeLength         int           = 12
 	defaultBind             string        = ":0"
-	version                 string        = "1.5.5"
-	prettyAppName           string        = "Remote Touchpad"
 )
 
+func writeVersion(w io.Writer) error {
+	_, err := fmt.Fprintln(w, buildinfo.Version)
+	return err
+}
+
 type config struct {
-	UpdateRate       uint    `json:"updateRate"`
-	ScrollSpeed      float64 `json:"scrollSpeed"`
-	MoveSpeed        float64 `json:"moveSpeed"`
-	MouseScrollSpeed float64 `json:"mouseScrollSpeed"`
-	MouseMoveSpeed   float64 `json:"mouseMoveSpeed"`
+	UpdateRate       uint         `json:"updateRate"`
+	ScrollSpeed      float64      `json:"scrollSpeed"`
+	MoveSpeed        float64      `json:"moveSpeed"`
+	MouseScrollSpeed float64      `json:"mouseScrollSpeed"`
+	MouseMoveSpeed   float64      `json:"mouseMoveSpeed"`
+	Capabilities     capabilities `json:"capabilities"`
+}
+
+type capabilities struct {
+	Gestures bool `json:"gestures"`
+}
+
+func controllerCapabilities(controller inputcontrol.Controller) capabilities {
+	_, gestures := controller.(inputcontrol.GestureController)
+	return capabilities{Gestures: gestures}
 }
 
 const (
@@ -67,6 +81,7 @@ const (
 	commandPointerScrollFinished   byte = 'S'
 	commandPointerMove             byte = 'm'
 	commandPointerButton           byte = 'b'
+	commandGesture                 byte = 'g'
 )
 
 func processCommand(controller inputcontrol.Controller, commandWithArg string) error {
@@ -103,6 +118,19 @@ func processCommand(controller inputcontrol.Controller, commandWithArg string) e
 			return errors.New("unsupported key")
 		}
 		return controller.KeyboardKey(key)
+	case commandGesture:
+		var action inputcontrol.GestureAction
+		if err := parseInts(arg, (*int)(&action)); err != nil {
+			return err
+		}
+		if action < 0 || action >= inputcontrol.GestureLimit {
+			return errors.New("unsupported gesture")
+		}
+		gestureController, ok := controller.(inputcontrol.GestureController)
+		if !ok {
+			return errors.New("gesture actions unsupported by controller")
+		}
+		return gestureController.Gesture(action)
 	case commandPointerScrollInProgress, commandPointerScrollFinished, commandPointerMove:
 		var x, y int
 		if len(arg) != 0 {
@@ -152,32 +180,25 @@ func authenticationChallengeGenerator(secret string, challenges chan<- challenge
 			log.Fatal(err)
 		}
 		message := base64.StdEncoding.EncodeToString(b[:])
-		mac := hmac.New(sha256.New, []byte(message))
-		mac.Write([]byte(secret))
 		challenges <- challenge{
 			message:          message,
-			expectedResponse: base64.StdEncoding.EncodeToString(mac.Sum(nil)),
+			expectedResponse: protocol.ChallengeResponse(message, secret),
 		}
 		time.Sleep(authenticationRateLimit)
 	}
 }
 
-func secureRandBase64(length int) string {
-	b := make([]byte, length)
-	if _, err := rand.Read(b[:]); err != nil {
-		log.Fatal(err)
-	}
-	return base64.StdEncoding.EncodeToString(b[:])
-}
-
 func main() {
-	terminal.SetTitle(prettyAppName)
-	var bind, certFile, keyFile, secret string
-	var showVersion bool
+	terminal.SetTitle(buildinfo.AppName)
+	var bind, certFile, keyFile, secret, secretFile string
+	var showVersion, showPairing, printHosts bool
 	var config config
 	flag.BoolVar(&showVersion, "version", false, "show program's version number and exit")
+	flag.BoolVar(&printHosts, "print-hosts", false, "print phone-reachable host names and exit")
 	flag.StringVar(&bind, "bind", defaultBind, "bind server to [HOSTNAME]:PORT")
 	flag.StringVar(&secret, "secret", "", "shared secret for client authentication")
+	flag.StringVar(&secretFile, "secret-file", "", "file containing the shared secret")
+	flag.BoolVar(&showPairing, "show-pairing", true, "print pairing URL and QR code")
 	flag.StringVar(&certFile, "cert", "", "file containing TLS certificate")
 	flag.StringVar(&keyFile, "key", "", "file containing TLS private key")
 	flag.UintVar(&config.UpdateRate, "update-rate", 30, "number of updates per second")
@@ -187,7 +208,19 @@ func main() {
 	flag.Float64Var(&config.MouseScrollSpeed, "mouse-scroll-speed", 1, "mouse scroll speed multiplier")
 	flag.Parse()
 	if showVersion {
-		fmt.Println(version)
+		if err := writeVersion(os.Stdout); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if printHosts {
+		primary, alternatives, err := findDefaultHosts()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := writeHosts(os.Stdout, primary, alternatives); err != nil {
+			log.Fatal(err)
+		}
 		return
 	}
 	if certFile != "" && keyFile == "" {
@@ -197,8 +230,16 @@ func main() {
 		log.Fatal("TLS certificate file missing")
 	}
 	tls := certFile != "" && keyFile != ""
+	var err error
+	secret, err = resolveSecret(secret, secretFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if secret == "" {
-		secret = secureRandBase64(defaultSecretLength)
+		secret, err = generateSecret(rand.Reader, defaultSecretLength)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	if len(inputcontrol.Controllers) == 0 {
 		log.Fatal("compiled without controller")
@@ -225,6 +266,7 @@ func main() {
 		log.Fatal(fmt.Errorf("unsupported platform:\n%w", errors.Join(platformErrs...)))
 	}
 	defer controller.Close()
+	config.Capabilities = controllerCapabilities(controller)
 	authenticationChallenges := make(chan challenge, authenticationRateBurst)
 	go authenticationChallengeGenerator(secret, authenticationChallenges)
 	listener, err := net.Listen("tcp", bind)
@@ -233,6 +275,7 @@ func main() {
 	}
 	addr := listener.Addr().(*net.TCPAddr)
 	host := ""
+	var alternativeHosts []string
 	bindHost, _, err := net.SplitHostPort(bind)
 	if err != nil {
 		log.Fatal(err)
@@ -244,7 +287,10 @@ func main() {
 		}
 	}
 	if host == "" {
-		host = findDefaultHost()
+		host, alternativeHosts, err = findDefaultHosts()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	port := addr.Port
 	mux := http.NewServeMux()
@@ -279,11 +325,15 @@ func main() {
 		scheme = "https"
 	}
 	url := fmt.Sprintf("%s://%s/#%s", scheme, domain, secret)
-	fmt.Println(url)
-	if qrCode, err := terminal.GenerateQRCode(url, terminal.SupportsColor(os.Stdout.Fd())); err == nil {
-		fmt.Print(qrCode)
-	} else {
+	if err := maybeWritePairingOutput(
+		os.Stdout, url, terminal.SupportsColor(os.Stdout.Fd()), showPairing,
+	); err != nil {
 		log.Printf("QR code error: %v", err)
+	}
+	if showPairing {
+		for _, alternativeHost := range alternativeHosts {
+			fmt.Printf("Alternative host: %s\n", alternativeHost)
+		}
 	}
 	if !tls {
 		fmt.Println("▌   WARNING: TLS is not enabled    ▐")

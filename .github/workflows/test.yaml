@@ -68,3 +68,29 @@ jobs:
         run: go build ./...
       - name: Go Test
         run: go test -race ./...
+
+  web-and-protocol:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27'
+      - name: Install script test dependencies
+        run: sudo apt-get update && sudo apt-get install --yes ripgrep shellcheck
+      - name: JavaScript behavior tests
+        run: node --test tests/*.test.mjs
+      - name: Shell checks
+        run: shellcheck scripts/*.sh scripts/lib/*.sh skills/phone-touchpad-plus/scripts/*.sh tests/*.sh tests/scripts/*.sh
+      - name: Isolated install lifecycle
+        run: bash tests/scripts/install_test.sh
+      - name: Read-only doctor lifecycle
+        run: bash tests/scripts/doctor_test.sh
+      - name: Conservative uninstall lifecycle
+        run: bash tests/scripts/uninstall_test.sh
+      - name: Codex Skill package
+        run: bash tests/skill_test.sh
+      - name: Live protocol test
+        run: bash tests/run-live-protocol.sh
+      - name: Repository privacy, documentation, and attribution
+        run: bash tests/check-repository.sh --self-test

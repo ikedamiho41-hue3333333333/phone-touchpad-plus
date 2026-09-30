@@ -1,4 +1,4 @@
-module github.com/unrud/remote-touchpad
+module github.com/ikedamiho41-hue3333333333/phone-touchpad-plus
 
 go 1.26.0
 

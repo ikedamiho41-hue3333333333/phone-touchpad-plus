@@ -1,0 +1,12 @@
+[Unit]
+Description=Phone Touchpad Plus
+After=graphical-session.target network.target
+
+[Service]
+Type=simple
+ExecStart="@RUNNER@" --binary "@BINARY@" --secret-file "@SECRET_FILE@" --settings "@SETTINGS_FILE@"
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

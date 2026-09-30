@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0 (2026-09-29)
+
+Phone Touchpad Plus is based on Unrud's Remote Touchpad 1.5.5.
+
+* Add a simplified Chinese, iPhone-friendly interface
+* Add finite multi-finger gestures and independent pointer/scroll sensitivity
+* Prevent two-finger scroll drift from being classified as pinch zoom
+* Add protected secret-file handling and safer local-network discovery
+* Add isolated user-service lifecycle tools and regression/integration tests
+
 ## 1.5.5 (2026-09-12)
 
 * Add macOS support

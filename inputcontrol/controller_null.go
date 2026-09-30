@@ -49,6 +49,11 @@ func (p *nullController) KeyboardKey(key Key) error {
 	return nil
 }
 
+func (p *nullController) Gesture(action GestureAction) error {
+	log.Printf("Gesture(action: %#v)", action)
+	return nil
+}
+
 func (p *nullController) PointerButton(button PointerButton, press bool) error {
 	log.Printf("PointerButton(button: %#v, press: %#v)", button, press)
 	return nil

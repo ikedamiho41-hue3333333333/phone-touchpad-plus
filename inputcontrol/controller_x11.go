@@ -47,6 +47,13 @@ import (
 const (
 	keyboardMappingDelay time.Duration = 200 * time.Millisecond
 	scrollDiv            int           = 20
+	xkShiftL             Keysym        = 0xffe1
+	xkControlL           Keysym        = 0xffe3
+	xkAltL               Keysym        = 0xffe9
+	xkTab                Keysym        = 0xff09
+	xkD                  Keysym        = 0x0064
+	xkEqual              Keysym        = 0x003d
+	xkMinus              Keysym        = 0x002d
 )
 
 var modifierIndexes = [...]int{
@@ -311,6 +318,54 @@ func (p *x11Controller) KeyboardKey(key Key) error {
 	}
 	keys := [...]Keysym{keysym}
 	return p.keyboardKeys(keys[:])
+}
+
+func (p *x11Controller) keyboardChord(keysyms ...Keysym) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	if p.display == nil {
+		return errors.New("X server connection closed")
+	}
+	keycodes := make([]C.KeyCode, len(keysyms))
+	for i, keysym := range keysyms {
+		keycodes[i] = C.XKeysymToKeycode(p.display, C.KeySym(keysym))
+		if keycodes[i] == 0 {
+			return fmt.Errorf("gesture keysym not mapped: %#x", keysym)
+		}
+		C.XTestFakeKeyEvent(p.display, C.uint(keycodes[i]), C.True, 0)
+	}
+	for i := len(keycodes) - 1; i >= 0; i-- {
+		C.XTestFakeKeyEvent(p.display, C.uint(keycodes[i]), C.False, 0)
+	}
+	C.XSync(p.display, C.False)
+	return nil
+}
+
+func gestureKeysyms(action GestureAction) ([]Keysym, error) {
+	switch action {
+	case GestureOverview:
+		return []Keysym{xkSuperL}, nil
+	case GestureShowDesktop:
+		return []Keysym{xkControlL, xkAltL, xkD}, nil
+	case GestureAppPrevious:
+		return []Keysym{xkAltL, xkShiftL, xkTab}, nil
+	case GestureAppNext:
+		return []Keysym{xkAltL, xkTab}, nil
+	case GestureZoomIn:
+		return []Keysym{xkControlL, xkEqual}, nil
+	case GestureZoomOut:
+		return []Keysym{xkControlL, xkMinus}, nil
+	default:
+		return nil, fmt.Errorf("unsupported gesture action: %#v", action)
+	}
+}
+
+func (p *x11Controller) Gesture(action GestureAction) error {
+	keysyms, err := gestureKeysyms(action)
+	if err != nil {
+		return err
+	}
+	return p.keyboardChord(keysyms...)
 }
 
 func (p *x11Controller) sendButton(button uint, press bool) error {

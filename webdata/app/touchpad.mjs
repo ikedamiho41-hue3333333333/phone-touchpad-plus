@@ -17,12 +17,26 @@
  *    along with Remote-Touchpad.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import {POINTER_BUTTON_LEFT, POINTER_BUTTON_MIDDLE, POINTER_BUTTON_RIGHT} from "./inputcontroller.mjs";
+import {
+    GESTURE_OVERVIEW,
+    GESTURE_SHOW_DESKTOP,
+    GESTURE_APP_PREVIOUS,
+    GESTURE_APP_NEXT,
+    GESTURE_ZOOM_IN,
+    GESTURE_ZOOM_OUT,
+    POINTER_BUTTON_LEFT,
+    POINTER_BUTTON_MIDDLE,
+    POINTER_BUTTON_RIGHT,
+} from "./inputcontroller.mjs";
 
 // [1 Touch, 2 Touches, 3 Touches] (as pixel)
-const TOUCH_MOVE_THRESHOLD = [10, 15, 15];
+const TOUCH_MOVE_THRESHOLD = [10, 8, 15];
 // Max time between consecutive touches for clicking or dragging (as milliseconds)
 const TOUCH_TIMEOUT = 250;
+const MULTI_SWIPE_THRESHOLD = 52;
+const PINCH_START_THRESHOLD = 10;
+const PINCH_FINGER_MOVE_THRESHOLD = 5;
+const PINCH_STEP = 22;
 // [[pixel/second, multiplicator], ...]
 const POINTER_ACCELERATION = [
     [0, 0],
@@ -71,6 +85,14 @@ export default class Touchpad {
     #ongoingTouches = [];
     #dragging = false;
     #draggingTimeout = null;
+    #gestureFingerCount = 0;
+    #gestureStartCentroid = null;
+    #gestureLastCentroid = null;
+    #twoFingerMode = "";
+    #twoFingerStartCentroid = null;
+    #pinchStartDistance = 0;
+    #pinchLastDistance = 0;
+    #pinchAccumulator = 0;
     #inputController;
     #checkAllowedCallback;
 
@@ -102,11 +124,116 @@ export default class Touchpad {
         this.#inputController.pointerButton(POINTER_BUTTON_LEFT, false);
     }
 
+    #centroid() {
+        if (this.#ongoingTouches.length == 0) {
+            return null;
+        }
+        let x = 0;
+        let y = 0;
+        for (const touch of this.#ongoingTouches) {
+            x += touch.pageX;
+            y += touch.pageY;
+        }
+        return {
+            x: x / this.#ongoingTouches.length,
+            y: y / this.#ongoingTouches.length,
+        };
+    }
+
+    #twoFingerDistance() {
+        if (this.#ongoingTouches.length != 2) {
+            return 0;
+        }
+        return Math.hypot(
+            this.#ongoingTouches[0].pageX - this.#ongoingTouches[1].pageX,
+            this.#ongoingTouches[0].pageY - this.#ongoingTouches[1].pageY,
+        );
+    }
+
+    #fingersMovedOppositely() {
+        if (this.#ongoingTouches.length != 2) {
+            return false;
+        }
+        const movements = this.#ongoingTouches.map((touch) => ({
+            x: touch.pageX - touch.pageXStart,
+            y: touch.pageY - touch.pageYStart,
+        }));
+        if (movements.some((movement) =>
+            Math.hypot(movement.x, movement.y) < PINCH_FINGER_MOVE_THRESHOLD)) {
+            return false;
+        }
+        return movements[0].x * movements[1].x +
+            movements[0].y * movements[1].y < 0;
+    }
+
+    #beginMultiGesture() {
+        if (this.#ongoingTouches.length < 3 || this.#gestureFingerCount != 0) {
+            return;
+        }
+        this.#gestureFingerCount = this.#ongoingTouches.length;
+        this.#gestureStartCentroid = this.#centroid();
+        this.#gestureLastCentroid = this.#gestureStartCentroid;
+    }
+
+    #feedback(message) {
+        document.dispatchEvent(new CustomEvent("gesturefeedback", {detail: message}));
+        navigator.vibrate?.(12);
+    }
+
+    #finishMultiGesture() {
+        if (this.#gestureStartCentroid == null || this.#gestureLastCentroid == null) {
+            return false;
+        }
+        const dx = this.#gestureLastCentroid.x - this.#gestureStartCentroid.x;
+        const dy = this.#gestureLastCentroid.y - this.#gestureStartCentroid.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < MULTI_SWIPE_THRESHOLD) {
+            if (this.#gestureFingerCount == 3) {
+                this.#inputController.pointerButton(POINTER_BUTTON_MIDDLE, true);
+                this.#inputController.pointerButton(POINTER_BUTTON_MIDDLE, false);
+                this.#feedback("三指轻点 · 中键");
+                return true;
+            }
+            return false;
+        }
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) {
+                if (this.#inputController.gesture(GESTURE_APP_NEXT)) {
+                    this.#feedback("下一个应用");
+                }
+            } else {
+                if (this.#inputController.gesture(GESTURE_APP_PREVIOUS)) {
+                    this.#feedback("上一个应用");
+                }
+            }
+        } else if (dy < 0) {
+            if (this.#inputController.gesture(GESTURE_OVERVIEW)) {
+                this.#feedback("活动概览");
+            }
+        } else {
+            if (this.#inputController.gesture(GESTURE_SHOW_DESKTOP)) {
+                this.#feedback("显示桌面");
+            }
+        }
+        return true;
+    }
+
+    #resetGestureState() {
+        this.#gestureFingerCount = 0;
+        this.#gestureStartCentroid = null;
+        this.#gestureLastCentroid = null;
+        this.#twoFingerMode = "";
+        this.#twoFingerStartCentroid = null;
+        this.#pinchStartDistance = 0;
+        this.#pinchLastDistance = 0;
+        this.#pinchAccumulator = 0;
+    }
+
     #handleTouchstart(event) {
         // Might get called multiple times for the same touches
         if (this.#ongoingTouches.length == 0) {
             this.#startTimeStamp = event.timeStamp;
             this.#moved = false;
+            this.#resetGestureState();
         }
         const touches = event.changedTouches;
         let foundTouch = false;
@@ -134,6 +261,12 @@ export default class Touchpad {
             this.#draggingTimeout = null;
             this.#dragging = true;
         }
+        if (this.#ongoingTouches.length == 2) {
+            this.#twoFingerStartCentroid = this.#centroid();
+            this.#pinchStartDistance = this.#twoFingerDistance();
+            this.#pinchLastDistance = this.#pinchStartDistance;
+        }
+        this.#beginMultiGesture();
         this.#inputController.pointerScroll(0, 0, true);
     }
 
@@ -146,6 +279,17 @@ export default class Touchpad {
                 continue;
             }
             foundTouch = true;
+            this.#ongoingTouches[idx].pageX = touches[i].pageX;
+            this.#ongoingTouches[idx].pageY = touches[i].pageY;
+        }
+        if (this.#gestureFingerCount >= 3) {
+            this.#gestureLastCentroid = this.#centroid();
+        }
+        for (let i = 0; i < touches.length; i += 1) {
+            const idx = this.#ongoingTouchIndexById(touches[i].identifier);
+            if (idx < 0) {
+                continue;
+            }
             this.#ongoingTouches.splice(idx, 1);
             this.#releasedCount += 1;
         }
@@ -163,7 +307,12 @@ export default class Touchpad {
                 this.#dragging = false;
                 this.#inputController.pointerButton(POINTER_BUTTON_LEFT, false);
             }
-            if (!this.#moved && event.timeStamp - this.#startTimeStamp < TOUCH_TIMEOUT) {
+            const handledMultiGesture = this.#gestureFingerCount >= 3 && this.#finishMultiGesture();
+            if (handledMultiGesture) {
+                this.#moved = true;
+            }
+            if (!handledMultiGesture && !this.#moved &&
+                event.timeStamp - this.#startTimeStamp < TOUCH_TIMEOUT) {
                 let button = 0;
                 if (this.#releasedCount == 1) {
                     button = POINTER_BUTTON_LEFT;
@@ -181,6 +330,7 @@ export default class Touchpad {
                 }
             }
             this.#releasedCount = 0;
+            this.#resetGestureState();
         }
     }
 
@@ -219,13 +369,52 @@ export default class Touchpad {
             return;
         }
         event.preventDefault();
+        this.#beginMultiGesture();
+        if (this.#gestureFingerCount >= 3) {
+            if (this.#ongoingTouches.length >= 3) {
+                this.#gestureFingerCount = Math.max(
+                    this.#gestureFingerCount, this.#ongoingTouches.length);
+                this.#gestureLastCentroid = this.#centroid();
+            }
+            this.#moved = true;
+            return;
+        }
         if (this.#moved && event.timeStamp - this.#lastEndTimeStamp >= TOUCH_TIMEOUT) {
             if (this.#ongoingTouches.length == 1 || this.#dragging) {
                 this.#inputController.pointerMove(
                     sumX * this.#moveSpeed, sumY * this.#moveSpeed);
             } else if (this.#ongoingTouches.length == 2) {
-                this.#inputController.pointerScroll(
-                    -sumX * this.#scrollSpeed, -sumY * this.#scrollSpeed, false);
+                const centroid = this.#centroid();
+                const distance = this.#twoFingerDistance();
+                const distanceFromStart = distance - this.#pinchStartDistance;
+                const centroidFromStart = this.#twoFingerStartCentroid == null ? 0 : Math.hypot(
+                    centroid.x - this.#twoFingerStartCentroid.x,
+                    centroid.y - this.#twoFingerStartCentroid.y,
+                );
+                if (this.#twoFingerMode == "" &&
+                    Math.abs(distanceFromStart) >= PINCH_START_THRESHOLD &&
+                    Math.abs(distanceFromStart) > centroidFromStart &&
+                    this.#fingersMovedOppositely()) {
+                    this.#twoFingerMode = "pinch";
+                } else if (this.#twoFingerMode == "" && centroidFromStart >= 8) {
+                    this.#twoFingerMode = "scroll";
+                }
+                if (this.#twoFingerMode == "pinch") {
+                    this.#pinchAccumulator += distance - this.#pinchLastDistance;
+                    while (Math.abs(this.#pinchAccumulator) >= PINCH_STEP) {
+                        const zoomIn = this.#pinchAccumulator > 0;
+                        const sent = this.#inputController.gesture(
+                            zoomIn ? GESTURE_ZOOM_IN : GESTURE_ZOOM_OUT);
+                        this.#pinchAccumulator += zoomIn ? -PINCH_STEP : PINCH_STEP;
+                        if (sent) {
+                            this.#feedback(zoomIn ? "放大" : "缩小");
+                        }
+                    }
+                } else if (this.#twoFingerMode == "scroll") {
+                    this.#inputController.pointerScroll(
+                        -sumX * this.#scrollSpeed, -sumY * this.#scrollSpeed, false);
+                }
+                this.#pinchLastDistance = distance;
             }
         }
     }

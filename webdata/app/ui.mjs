@@ -20,6 +20,7 @@
 import Keyboard from "./keyboard.mjs";
 import Mouse from "./mouse.mjs";
 import Touchpad from "./touchpad.mjs";
+import {applyGestureCapability} from "./capabilities.mjs";
 import * as compat from "./compat.mjs";
 
 const IGNORE_CLICK_AFTER_TOUCH_DURATION = 1000; // milliseconds
@@ -36,6 +37,7 @@ const textInputScene = document.getElementById("text-input");
 const textInput = textInputScene.querySelector("textarea");
 const mouseScene = document.getElementById("mouse");
 const sendText = document.getElementById("send-text");
+const gestureStatus = document.getElementById("gesture-status");
 
 export default class UI {
     #activeScene = null;
@@ -47,6 +49,7 @@ export default class UI {
     #mouse;
     #keyboard;
     #touchpad;
+    #gestureStatusTimeout = null;
 
     constructor(inputController) {
         this.#inputController = inputController;
@@ -57,6 +60,7 @@ export default class UI {
             (target) => target.classList.contains("touch-input"));
         document.addEventListener("mousedown", this.#handleMousedown.bind(this));
         document.addEventListener("touchend", this.#handleTouchend.bind(this));
+        document.addEventListener("gesturefeedback", this.#handleGestureFeedback.bind(this));
         textInput.addEventListener("input", () => { this.#updateTextInput(); });
         sendText.addEventListener("click", this.#handleSendText.bind(this));
         window.addEventListener("popstate", () => { this.#update(); });
@@ -69,7 +73,20 @@ export default class UI {
         this.#update();
     }
 
+    #handleGestureFeedback(event) {
+        gestureStatus.textContent = event.detail;
+        gestureStatus.classList.add("visible");
+        if (this.#gestureStatusTimeout != null) {
+            clearTimeout(this.#gestureStatusTimeout);
+        }
+        this.#gestureStatusTimeout = setTimeout(() => {
+            gestureStatus.classList.remove("visible");
+            this.#gestureStatusTimeout = null;
+        }, 850);
+    }
+
    configure(config) {
+        applyGestureCapability(config, document.querySelectorAll(".gesture-capability"));
         this.#mouse.configure(config);
         this.#keyboard.configure(config);
         this.#touchpad.configure(config);

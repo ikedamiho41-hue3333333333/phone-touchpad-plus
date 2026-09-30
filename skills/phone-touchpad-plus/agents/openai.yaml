@@ -1,0 +1,5 @@
+interface:
+  display_name: "Phone Touchpad Plus"
+  short_description: "Safely manage an iPhone touchpad service"
+  default_prompt: "Use $phone-touchpad-plus to diagnose my iPhone touchpad connection safely."
+

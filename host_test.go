@@ -71,8 +71,24 @@ func TestSelectHostsPrefersPrivateIPv4OverGlobalIPv6(t *testing.T) {
 	if primary != "192.168.50.10" {
 		t.Fatalf("primary = %q, want private IPv4", primary)
 	}
-	if want := []string{"2001:db8::10"}; !reflect.DeepEqual(alternatives, want) {
+	if want := []string{}; !reflect.DeepEqual(alternatives, want) {
 		t.Fatalf("alternatives = %#v, want %#v", alternatives, want)
+	}
+}
+
+func TestSelectHostsRejectsGlobalOnlyCandidate(t *testing.T) {
+	const globalAddress = "203.0.113.10"
+	primary, observed, err := selectHosts([]hostCandidate{
+		{Name: "eth0", IP: net.ParseIP(globalAddress), Flags: net.FlagUp, DefaultRoute: true},
+	})
+	if err == nil || !strings.Contains(err.Error(), "no reachable LAN address") {
+		t.Fatalf("error = %v, want descriptive LAN error", err)
+	}
+	if primary != "" {
+		t.Fatalf("primary = %q, want empty", primary)
+	}
+	if want := []string{globalAddress}; !reflect.DeepEqual(observed, want) {
+		t.Fatalf("observed candidates = %#v, want %#v", observed, want)
 	}
 }
 

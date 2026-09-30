@@ -58,18 +58,14 @@ func candidateScore(candidate hostCandidate) (int, bool) {
 
 	score := 0
 	if candidate.IP.To4() != nil {
-		if candidate.IP.IsPrivate() {
-			score = 4000
-		} else if candidate.IP.IsGlobalUnicast() {
-			score = 3000
+		if !candidate.IP.IsPrivate() {
+			return 0, false
 		}
-	} else if candidate.IP.IsPrivate() {
-		score = 2000
-	} else if candidate.IP.IsGlobalUnicast() {
-		score = 1000
-	}
-	if score == 0 {
+		score = 4000
+	} else if !candidate.IP.IsPrivate() {
 		return 0, false
+	} else {
+		score = 2000
 	}
 	if candidate.DefaultRoute {
 		score += 100

@@ -21,12 +21,14 @@
 
 package inputcontrol
 
-// #cgo LDFLAGS: -framework CoreGraphics
+// #cgo LDFLAGS: -framework CoreGraphics -framework ApplicationServices
+// #include <ApplicationServices/ApplicationServices.h>
 // #include <Carbon/Carbon.h>
 // #include <IOKit/hidsystem/ev_keymap.h>
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -42,6 +44,10 @@ const (
 
 const clickInterval = 500 * time.Millisecond
 
+var errDarwinAccessibilityPermission = errors.New(
+	"macOS Accessibility permission is required for Phone Touchpad Plus",
+)
+
 type darwinController struct {
 	eventSrc           C.CGEventSourceRef
 	lock               sync.Mutex
@@ -52,11 +58,47 @@ type darwinController struct {
 	}
 }
 
+type darwinShortcut struct {
+	virtualKey C.CGKeyCode
+	flags      C.CGEventFlags
+}
+
+func darwinGestureShortcut(action GestureAction) (darwinShortcut, error) {
+	switch action {
+	case GestureOverview:
+		return darwinShortcut{C.kVK_UpArrow, C.kCGEventFlagMaskControl}, nil
+	case GestureShowDesktop:
+		return darwinShortcut{C.kVK_F3, C.kCGEventFlagMaskCommand}, nil
+	case GestureAppPrevious:
+		return darwinShortcut{C.kVK_Tab, C.kCGEventFlagMaskCommand | C.kCGEventFlagMaskShift}, nil
+	case GestureAppNext:
+		return darwinShortcut{C.kVK_Tab, C.kCGEventFlagMaskCommand}, nil
+	case GestureZoomIn:
+		return darwinShortcut{C.kVK_ANSI_Equal, C.kCGEventFlagMaskCommand | C.kCGEventFlagMaskShift}, nil
+	case GestureZoomOut:
+		return darwinShortcut{C.kVK_ANSI_Minus, C.kCGEventFlagMaskCommand}, nil
+	default:
+		return darwinShortcut{}, fmt.Errorf("unsupported gesture action: %#v", action)
+	}
+}
+
 func init() {
 	RegisterController("Darwin", InitDarwinController, 0)
 }
 
 func InitDarwinController() (Controller, error) {
+	return initDarwinController(func() bool {
+		if bool(C.CGPreflightPostEventAccess()) {
+			return true
+		}
+		return bool(C.CGRequestPostEventAccess())
+	})
+}
+
+func initDarwinController(hasPostEventAccess func() bool) (Controller, error) {
+	if !hasPostEventAccess() {
+		return nil, errDarwinAccessibilityPermission
+	}
 	eventSrc := C.CGEventSourceCreate(C.kCGEventSourceStatePrivate)
 	if eventSrc == 0 {
 		return nil, &UnsupportedPlatformError{
@@ -188,6 +230,14 @@ func (p *darwinController) KeyboardKey(key Key) error {
 	default:
 		return fmt.Errorf("key not mapped to virtual-key code: %#v", key)
 	}
+}
+
+func (p *darwinController) Gesture(action GestureAction) error {
+	shortcut, err := darwinGestureShortcut(action)
+	if err != nil {
+		return err
+	}
+	return p.sendKeyboardKeyPress(shortcut.virtualKey, shortcut.flags, nil)
 }
 
 func (p *darwinController) mouseLocation() (C.CGPoint, error) {

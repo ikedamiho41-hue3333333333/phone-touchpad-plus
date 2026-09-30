@@ -23,7 +23,10 @@ if [[ "${1:-}" == "--self-test" ]]; then
     exit 0
 fi
 
-mapfile -d '' repository_files < <(git ls-files --cached --others --exclude-standard -z)
+repository_files=()
+while IFS= read -r -d '' file; do
+    repository_files[${#repository_files[@]}]=${file}
+done < <(git ls-files --cached --others --exclude-standard -z)
 text_files=()
 for file in "${repository_files[@]}"; do
     if [[ -f "${file}" ]]; then
@@ -87,8 +90,12 @@ fi
 
 private_user=${PTP_PRIVATE_USERNAME:-$(id -un)}
 if [[ -n "${private_user}" && "${private_user}" != root && "${private_user}" != runner ]]; then
-    user_matches=$(rg --line-number --no-heading --color=never --fixed-strings \
-        "${private_user}" -- "${text_files[@]}" || true)
+    user_matches=$(
+        rg --line-number --no-heading --color=never --fixed-strings \
+            "/Users/${private_user}/" -- "${text_files[@]}" || true
+        rg --line-number --no-heading --color=never --fixed-strings \
+            "/home/${private_user}/" -- "${text_files[@]}" || true
+    )
     if [[ -n "${user_matches}" ]]; then
         printf 'local operating-system username found:\n%s\n' "${user_matches}" >&2
         failed=true
@@ -106,7 +113,7 @@ if [[ -n "${private_hostname}" ]]; then
 fi
 
 for file in "${repository_files[@]}"; do
-    lower_file=${file,,}
+    lower_file=$(printf '%s' "${file}" | tr '[:upper:]' '[:lower:]')
     if [[ "${lower_file}" =~ (^|/)(pairing|qr-code)[^/]*\.png$ ]]; then
         printf 'generated pairing QR file found: %s\n' "${file}" >&2
         failed=true

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+* Add an Apple Silicon macOS installer and per-user LaunchAgent.
+* Add macOS mappings for application switching, Mission Control, Show Desktop, and application zoom.
+* Detect missing macOS Accessibility permission instead of silently dropping input events.
+
 ## 0.1.0 (2026-09-29)
 
 Phone Touchpad Plus is based on Unrud's Remote Touchpad 1.5.5.

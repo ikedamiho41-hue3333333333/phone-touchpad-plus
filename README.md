@@ -2,15 +2,15 @@
 
 [中文说明](README.zh-CN.md)
 
-Phone Touchpad Plus turns an iPhone browser into a touchpad and keyboard for a Linux desktop. Release **v0.1.0** adds a Simplified Chinese mobile interface, independent pointer and scroll sensitivity, protected pairing-secret storage, LAN-aware pairing, and GNOME-style multi-touch gestures.
+Phone Touchpad Plus turns an iPhone browser into a touchpad and keyboard for Linux and macOS. Release **v0.1.0** adds a Simplified Chinese mobile interface, independent pointer and scroll sensitivity, protected pairing-secret storage, LAN-aware pairing, and multi-touch gestures.
 
 This fork is based on [Unrud/remote-touchpad v1.5.5](https://github.com/Unrud/remote-touchpad/tree/v1.5.5) and is licensed under **GPL-3.0-or-later**.
 
 ## Supported scope
 
-v0.1.0 is source-only and validated on **Ubuntu 24.04 with GNOME X11**, using an iPhone with Safari. Use it only on a **trusted local network (trusted LAN)**: pairing is authenticated, but transport has **no TLS**.
+v0.1.0 is source-only and primarily validated on **Ubuntu 24.04 with GNOME X11**, using an iPhone with Safari. The current source also contains an Apple Silicon macOS installer, a LaunchAgent, and macOS enhanced-gesture mappings. Use it only on a **trusted local network (trusted LAN)**: pairing is authenticated, but transport has **no TLS**.
 
-Windows, macOS, and Wayland do not provide the Phone Touchpad Plus enhanced gestures in v0.1.0. Their inherited upstream code and the `desktop/`, `flatpak/`, and `snap/` metadata remain reference material, not supported Phone Touchpad Plus binary release channels.
+Windows and Wayland do not provide the Phone Touchpad Plus enhanced gestures in v0.1.0. Their inherited upstream code and the `desktop/`, `flatpak/`, and `snap/` metadata remain reference material, not supported Phone Touchpad Plus binary release channels.
 
 ## Install and pair
 
@@ -24,6 +24,15 @@ bash scripts/install.sh
 ```
 
 The installer creates a systemd user service and a private QR image at `${HOME}/.local/share/phone-touchpad-plus/pairing.png`. Scan it with the iPhone Camera app, open the page in Safari, and optionally add it to the Home Screen. The pairing URL fragment is a secret; do not paste it into issues or logs.
+
+On Apple Silicon macOS, install Go 1.26 or newer and Xcode Command Line Tools, then run:
+
+```bash
+bash scripts/install-macos.sh --dry-run
+bash scripts/install-macos.sh
+```
+
+Allow `Phone Touchpad Plus` from `~/Applications/Phone Touchpad Plus` in **System Settings → Privacy & Security → Accessibility**. The macOS installer creates `~/Library/LaunchAgents/com.ikedamiho41.phone-touchpad-plus.plist` and writes service logs under `~/Library/Logs/Phone Touchpad Plus/`. Open the private pairing QR code with `open ~/.local/share/phone-touchpad-plus/pairing.png`.
 
 ## Operate and maintain
 

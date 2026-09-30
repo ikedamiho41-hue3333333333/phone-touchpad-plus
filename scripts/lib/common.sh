@@ -16,9 +16,27 @@ ptp_require_command() {
 ptp_version_ge() {
     local actual=$1
     local required=$2
-    local first
-    first=$(printf '%s\n%s\n' "${required}" "${actual}" | sort -V | head -n 1)
-    [[ "${first}" == "${required}" ]]
+    awk -v actual="${actual}" -v required="${required}" 'BEGIN {
+        actual_count = split(actual, actual_parts, ".")
+        required_count = split(required, required_parts, ".")
+        count = actual_count > required_count ? actual_count : required_count
+        for (i = 1; i <= count; i++) {
+            actual_part = actual_parts[i] + 0
+            required_part = required_parts[i] + 0
+            if (actual_part > required_part) exit 0
+            if (actual_part < required_part) exit 1
+        }
+        exit 0
+    }'
+}
+
+ptp_xml_escape() {
+    printf '%s' "$1" | sed \
+        -e 's/&/\&amp;/g' \
+        -e 's/</\&lt;/g' \
+        -e 's/>/\&gt;/g' \
+        -e 's/"/\&quot;/g' \
+        -e 's/'"'"'/\&apos;/g'
 }
 
 ptp_validate_path() {

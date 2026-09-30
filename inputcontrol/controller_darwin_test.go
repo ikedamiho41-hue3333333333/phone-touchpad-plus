@@ -31,8 +31,8 @@ func TestDarwinGestureShortcuts(t *testing.T) {
 	}{
 		{name: "mission control", action: GestureOverview, key: 126, flags: 0x00040000},
 		{name: "show desktop", action: GestureShowDesktop, key: 99, flags: 0x00100000},
-		{name: "previous application", action: GestureAppPrevious, key: 48, flags: 0x00120000},
-		{name: "next application", action: GestureAppNext, key: 48, flags: 0x00100000},
+		{name: "previous desktop", action: GestureAppPrevious, key: 123, flags: 0x00040000},
+		{name: "next desktop", action: GestureAppNext, key: 124, flags: 0x00040000},
 		{name: "zoom in", action: GestureZoomIn, key: 24, flags: 0x00120000},
 		{name: "zoom out", action: GestureZoomOut, key: 27, flags: 0x00100000},
 	}

@@ -88,6 +88,7 @@ export default class Touchpad {
     #gestureFingerCount = 0;
     #gestureStartCentroid = null;
     #gestureLastCentroid = null;
+    #multiGestureTriggered = false;
     #twoFingerMode = "";
     #twoFingerStartCentroid = null;
     #pinchStartDistance = 0;
@@ -180,14 +181,14 @@ export default class Touchpad {
         navigator.vibrate?.(12);
     }
 
-    #finishMultiGesture() {
+    #finishMultiGesture(allowTap = true) {
         if (this.#gestureStartCentroid == null || this.#gestureLastCentroid == null) {
             return false;
         }
         const dx = this.#gestureLastCentroid.x - this.#gestureStartCentroid.x;
         const dy = this.#gestureLastCentroid.y - this.#gestureStartCentroid.y;
         if (Math.max(Math.abs(dx), Math.abs(dy)) < MULTI_SWIPE_THRESHOLD) {
-            if (this.#gestureFingerCount == 3) {
+            if (allowTap && this.#gestureFingerCount == 3) {
                 this.#inputController.pointerButton(POINTER_BUTTON_MIDDLE, true);
                 this.#inputController.pointerButton(POINTER_BUTTON_MIDDLE, false);
                 this.#feedback("三指轻点 · 中键");
@@ -198,11 +199,11 @@ export default class Touchpad {
         if (Math.abs(dx) > Math.abs(dy)) {
             if (dx < 0) {
                 if (this.#inputController.gesture(GESTURE_APP_NEXT)) {
-                    this.#feedback("下一个应用");
+                    this.#feedback("下一个桌面");
                 }
             } else {
                 if (this.#inputController.gesture(GESTURE_APP_PREVIOUS)) {
-                    this.#feedback("上一个应用");
+                    this.#feedback("上一个桌面");
                 }
             }
         } else if (dy < 0) {
@@ -221,6 +222,7 @@ export default class Touchpad {
         this.#gestureFingerCount = 0;
         this.#gestureStartCentroid = null;
         this.#gestureLastCentroid = null;
+        this.#multiGestureTriggered = false;
         this.#twoFingerMode = "";
         this.#twoFingerStartCentroid = null;
         this.#pinchStartDistance = 0;
@@ -307,7 +309,8 @@ export default class Touchpad {
                 this.#dragging = false;
                 this.#inputController.pointerButton(POINTER_BUTTON_LEFT, false);
             }
-            const handledMultiGesture = this.#gestureFingerCount >= 3 && this.#finishMultiGesture();
+            const handledMultiGesture = this.#gestureFingerCount >= 3 &&
+                (this.#multiGestureTriggered || this.#finishMultiGesture());
             if (handledMultiGesture) {
                 this.#moved = true;
             }
@@ -375,6 +378,9 @@ export default class Touchpad {
                 this.#gestureFingerCount = Math.max(
                     this.#gestureFingerCount, this.#ongoingTouches.length);
                 this.#gestureLastCentroid = this.#centroid();
+            }
+            if (!this.#multiGestureTriggered && this.#finishMultiGesture(false)) {
+                this.#multiGestureTriggered = true;
             }
             this.#moved = true;
             return;

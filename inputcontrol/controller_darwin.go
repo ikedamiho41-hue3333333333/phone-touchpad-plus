@@ -70,9 +70,9 @@ func darwinGestureShortcut(action GestureAction) (darwinShortcut, error) {
 	case GestureShowDesktop:
 		return darwinShortcut{C.kVK_F3, C.kCGEventFlagMaskCommand}, nil
 	case GestureAppPrevious:
-		return darwinShortcut{C.kVK_Tab, C.kCGEventFlagMaskCommand | C.kCGEventFlagMaskShift}, nil
+		return darwinShortcut{C.kVK_LeftArrow, C.kCGEventFlagMaskControl}, nil
 	case GestureAppNext:
-		return darwinShortcut{C.kVK_Tab, C.kCGEventFlagMaskCommand}, nil
+		return darwinShortcut{C.kVK_RightArrow, C.kCGEventFlagMaskControl}, nil
 	case GestureZoomIn:
 		return darwinShortcut{C.kVK_ANSI_Equal, C.kCGEventFlagMaskCommand | C.kCGEventFlagMaskShift}, nil
 	case GestureZoomOut:

@@ -32,7 +32,7 @@ const createTouchpadHarness = () => {
     const buttons = [];
     const moves = [];
     const inputController = {
-        gesture(action) { gestures.push(action); },
+        gesture(action) { gestures.push(action); return true; },
         pointerButton(button, press) { buttons.push({button, press}); },
         pointerMove(x, y) { moves.push({x, y}); },
         pointerScroll(x, y, finish) { scrolls.push({x, y, finish}); },
@@ -93,11 +93,11 @@ const performThreeFingerSwipe = (deltaX, deltaY) => {
     return harness;
 };
 
-test("three-finger swipe left switches to the next application", () => {
+test("three-finger swipe left switches to the next desktop", () => {
     assert.deepEqual(performThreeFingerSwipe(-60, 0).gestures, [3]); // GestureAppNext
 });
 
-test("three-finger swipe right switches to the previous application", () => {
+test("three-finger swipe right switches to the previous desktop", () => {
     assert.deepEqual(performThreeFingerSwipe(60, 0).gestures, [2]); // GestureAppPrevious
 });
 
@@ -107,4 +107,23 @@ test("three-finger swipe up opens the overview", () => {
 
 test("three-finger swipe down shows the desktop", () => {
     assert.deepEqual(performThreeFingerSwipe(0, 60).gestures, [1]); // GestureShowDesktop
+});
+
+test("three-finger horizontal swipe triggers before release and only once", () => {
+    const harness = createTouchpadHarness();
+    const starts = [
+        harness.touch(1, 0, 0),
+        harness.touch(2, 20, 0),
+        harness.touch(3, 40, 0),
+    ];
+    const ends = starts.map(({identifier, pageX, pageY}) =>
+        harness.touch(identifier, pageX - 60, pageY));
+
+    harness.fire("touchstart", starts, 0);
+    harness.fire("touchmove", ends, 300);
+    assert.deepEqual(harness.gestures, [3]); // GestureAppNext
+    assert.deepEqual(harness.feedback, ["下一个桌面"]);
+
+    harness.fire("touchend", ends, 320);
+    assert.deepEqual(harness.gestures, [3]);
 });

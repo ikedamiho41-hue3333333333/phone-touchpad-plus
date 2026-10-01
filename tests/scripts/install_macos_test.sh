@@ -141,5 +141,8 @@ rg --quiet 'launchctl kickstart -k gui/[0-9]+/com\.ikedamiho41\.phone-touchpad-p
     "${install_root}/launchctl.log" || fail 'LaunchAgent was not started'
 rg --quiet 'codesign --force --sign - --identifier com\.ikedamiho41\.phone-touchpad-plus ' \
     "${install_root}/codesign.log" || fail 'application was not signed with its stable identifier'
+rg --fixed-strings --quiet \
+    'designated => identifier "com.ikedamiho41.phone-touchpad-plus"' \
+    "${install_root}/codesign.log" || fail 'application signature requirement is not stable across upgrades'
 
 printf 'isolated macOS install lifecycle tests passed\n'

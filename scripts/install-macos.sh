@@ -9,6 +9,7 @@ readonly repo_root
 source "${script_dir}/lib/common.sh"
 
 readonly launch_agent_label=com.ikedamiho41.phone-touchpad-plus
+readonly code_requirement="=designated => identifier \"${launch_agent_label}\""
 dry_run=false
 upgrade=false
 prefix="${HOME}/.local"
@@ -98,7 +99,8 @@ cd "${repo_root}"
 "${go_command}" build -trimpath -o "${stage_app}" .
 "${go_command}" build -trimpath -o "${stage_qr_helper}" ./tools/makeqr
 "${go_command}" build -trimpath -o "${stage_probe}" ./tools/probe
-"${codesign_command}" --force --sign - --identifier "${launch_agent_label}" "${stage_app}"
+"${codesign_command}" --force --sign - --identifier "${launch_agent_label}" \
+    --requirements "${code_requirement}" "${stage_app}"
 "${codesign_command}" --verify --strict "${stage_app}"
 [[ "$("${stage_app}" -version)" == 0.1.0 ]] || { ptp_die 'staged application version check failed'; exit 1; }
 "${stage_probe}" -help >/dev/null 2>&1 || { ptp_die 'staged probe validation failed'; exit 1; }

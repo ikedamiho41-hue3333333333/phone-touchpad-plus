@@ -31,8 +31,10 @@ import {
 
 // [1 Touch, 2 Touches, 3 Touches] (as pixel)
 const TOUCH_MOVE_THRESHOLD = [10, 8, 15];
-// Max time between consecutive touches for clicking or dragging (as milliseconds)
+// Max touch duration for a tap (as milliseconds)
 const TOUCH_TIMEOUT = 250;
+// Hold duration before a one-finger movement becomes a drag (as milliseconds)
+const DRAG_HOLD_TIMEOUT = 350;
 const MULTI_SWIPE_THRESHOLD = 52;
 const PINCH_START_THRESHOLD = 10;
 const PINCH_FINGER_MOVE_THRESHOLD = 5;
@@ -84,7 +86,7 @@ export default class Touchpad {
     #releasedCount = 0;
     #ongoingTouches = [];
     #dragging = false;
-    #draggingTimeout = null;
+    #dragCandidate = false;
     #gestureFingerCount = 0;
     #gestureStartCentroid = null;
     #gestureLastCentroid = null;
@@ -118,11 +120,6 @@ export default class Touchpad {
             }
         }
         return -1;
-    }
-
-    #handleDraggingTimeout() {
-        this.#draggingTimeout = null;
-        this.#inputController.pointerButton(POINTER_BUTTON_LEFT, false);
     }
 
     #centroid() {
@@ -235,6 +232,7 @@ export default class Touchpad {
         if (this.#ongoingTouches.length == 0) {
             this.#startTimeStamp = event.timeStamp;
             this.#moved = false;
+            this.#dragCandidate = true;
             this.#resetGestureState();
         }
         const touches = event.changedTouches;
@@ -258,10 +256,8 @@ export default class Touchpad {
         }
         event.preventDefault();
         this.#lastEndTimeStamp = 0;
-        if (this.#draggingTimeout != null) {
-            clearTimeout(this.#draggingTimeout);
-            this.#draggingTimeout = null;
-            this.#dragging = true;
+        if (this.#ongoingTouches.length != 1) {
+            this.#dragCandidate = false;
         }
         if (this.#ongoingTouches.length == 2) {
             this.#twoFingerStartCentroid = this.#centroid();
@@ -307,6 +303,7 @@ export default class Touchpad {
         if (this.#ongoingTouches.length == 0 && this.#releasedCount >= 1) {
             if (this.#dragging) {
                 this.#dragging = false;
+                this.#moved = true;
                 this.#inputController.pointerButton(POINTER_BUTTON_LEFT, false);
             }
             const handledMultiGesture = this.#gestureFingerCount >= 3 &&
@@ -325,14 +322,10 @@ export default class Touchpad {
                     button = POINTER_BUTTON_MIDDLE;
                 }
                 this.#inputController.pointerButton(button, true);
-                if (button == POINTER_BUTTON_LEFT) {
-                    this.#draggingTimeout = setTimeout(
-                        this.#handleDraggingTimeout.bind(this), TOUCH_TIMEOUT);
-                } else {
-                    this.#inputController.pointerButton(button, false);
-                }
+                this.#inputController.pointerButton(button, false);
             }
             this.#releasedCount = 0;
+            this.#dragCandidate = false;
             this.#resetGestureState();
         }
     }
@@ -342,17 +335,24 @@ export default class Touchpad {
         let sumY = 0;
         const touches = event.changedTouches;
         let foundTouch = false;
+        const canStartDrag = this.#dragCandidate &&
+            this.#ongoingTouches.length == 1 &&
+            event.timeStamp - this.#startTimeStamp >= DRAG_HOLD_TIMEOUT;
         for (let i = 0; i < touches.length; i += 1) {
             const idx = this.#ongoingTouchIndexById(touches[i].identifier);
             if (idx < 0) {
                 continue;
             }
             foundTouch = true;
+            const dist = Math.sqrt(
+                Math.pow(touches[i].pageX - this.#ongoingTouches[idx].pageXStart, 2) +
+                Math.pow(touches[i].pageY - this.#ongoingTouches[idx].pageYStart, 2)
+            );
+            if (this.#dragCandidate && !canStartDrag &&
+                dist > TOUCH_MOVE_THRESHOLD[this.#ongoingTouches.length - 1]) {
+                this.#dragCandidate = false;
+            }
             if (!this.#moved) {
-                const dist = Math.sqrt(
-                    Math.pow(touches[i].pageX - this.#ongoingTouches[idx].pageXStart, 2) +
-                    Math.pow(touches[i].pageY - this.#ongoingTouches[idx].pageYStart, 2)
-                );
                 if (this.#ongoingTouches.length > TOUCH_MOVE_THRESHOLD.length ||
                     dist > TOUCH_MOVE_THRESHOLD[this.#ongoingTouches.length - 1] ||
                     event.timeStamp - this.#startTimeStamp >= TOUCH_TIMEOUT) {
@@ -372,6 +372,11 @@ export default class Touchpad {
             return;
         }
         event.preventDefault();
+        if (canStartDrag && this.#dragCandidate && !this.#dragging) {
+            this.#inputController.pointerButton(POINTER_BUTTON_LEFT, true);
+            this.#dragging = true;
+            this.#moved = true;
+        }
         this.#beginMultiGesture();
         if (this.#gestureFingerCount >= 3) {
             if (this.#ongoingTouches.length >= 3) {

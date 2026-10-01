@@ -49,6 +49,43 @@ const createTouchpadHarness = () => {
     return {buttons, feedback, fire, gestures, moves, scrolls, touch};
 };
 
+test("single-finger tap releases the left button immediately", () => {
+    const {buttons, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchend", [touch(1, 20, 20)], 100);
+
+    assert.deepEqual(buttons, [
+        {button: 0, press: true},
+        {button: 0, press: false},
+    ]);
+});
+
+test("holding before moving starts and finishes a drag", () => {
+    const {buttons, fire, moves, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchmove", [touch(1, 40, 20)], 400);
+    fire("touchend", [touch(1, 40, 20)], 450);
+
+    assert.deepEqual(buttons, [
+        {button: 0, press: true},
+        {button: 0, press: false},
+    ]);
+    assert.ok(moves.length > 0);
+});
+
+test("ordinary pointer movement never holds the left button", () => {
+    const {buttons, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchmove", [touch(1, 40, 20)], 100);
+    fire("touchmove", [touch(1, 60, 20)], 400);
+    fire("touchend", [touch(1, 60, 20)], 450);
+
+    assert.deepEqual(buttons, []);
+});
+
 test("two-finger scrolling drift does not emit a zoom gesture", () => {
     const {fire, gestures, scrolls, touch} = createTouchpadHarness();
 

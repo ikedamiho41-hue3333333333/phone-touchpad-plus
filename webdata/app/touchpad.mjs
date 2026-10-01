@@ -332,8 +332,7 @@ export default class Touchpad {
                 } else if (this.#releasedCount == 3) {
                     button = POINTER_BUTTON_MIDDLE;
                 }
-                this.#inputController.pointerButton(button, true);
-                this.#inputController.pointerButton(button, false);
+                this.#inputController.pointerClick(button);
             }
             this.#releasedCount = 0;
             this.#dragCandidate = false;

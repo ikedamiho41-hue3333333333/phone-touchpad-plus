@@ -54,6 +54,7 @@ const COMMAND_POINTER_SCROLL_FINISHED = "S";
 const COMMAND_POINTER_MOVE = "m";
 const COMMAND_POINTER_BUTTON = "b";
 const COMMAND_GESTURE = "g";
+const POINTER_CLICK_DURATION = 35;
 
 export default class InputController {
     #updateRate = 0;
@@ -130,6 +131,11 @@ export default class InputController {
 
     pointerButton(button, press) {
         this.#socket.send(`${COMMAND_POINTER_BUTTON}${button};${press ? 1 : 0}`);
+    }
+
+    pointerClick(button) {
+        this.pointerButton(button, true);
+        setTimeout(() => this.pointerButton(button, false), POINTER_CLICK_DURATION);
     }
 
     keyboardKey(key) {

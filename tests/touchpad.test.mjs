@@ -30,10 +30,12 @@ const createTouchpadHarness = (config = {}) => {
     const gestures = [];
     const scrolls = [];
     const buttons = [];
+    const clicks = [];
     const moves = [];
     const inputController = {
         gesture(action) { gestures.push(action); return true; },
         pointerButton(button, press) { buttons.push({button, press}); },
+        pointerClick(button) { clicks.push(button); },
         pointerMove(x, y) { moves.push({x, y}); },
         pointerScroll(x, y, finish) { scrolls.push({x, y, finish}); },
     };
@@ -51,44 +53,36 @@ const createTouchpadHarness = (config = {}) => {
             listener({changedTouches, timeStamp, preventDefault() {}});
         }
     };
-    return {buttons, feedback, fire, gestures, moves, scrolls, touch};
+    return {buttons, clicks, feedback, fire, gestures, moves, scrolls, touch};
 };
 
-test("single-finger tap releases the left button immediately", () => {
-    const {buttons, fire, touch} = createTouchpadHarness();
+test("single-finger tap requests a complete left click", () => {
+    const {buttons, clicks, fire, touch} = createTouchpadHarness();
 
     fire("touchstart", [touch(1, 20, 20)], 0);
     fire("touchend", [touch(1, 20, 20)], 100);
 
-    assert.deepEqual(buttons, [
-        {button: 0, press: true},
-        {button: 0, press: false},
-    ]);
+    assert.deepEqual(clicks, [0]);
+    assert.deepEqual(buttons, []);
 });
 
 test("a relaxed 400ms tap still clicks", () => {
-    const {buttons, fire, touch} = createTouchpadHarness();
+    const {clicks, fire, touch} = createTouchpadHarness();
 
     fire("touchstart", [touch(1, 20, 20)], 0);
     fire("touchend", [touch(1, 20, 20)], 400);
 
-    assert.deepEqual(buttons, [
-        {button: 0, press: true},
-        {button: 0, press: false},
-    ]);
+    assert.deepEqual(clicks, [0]);
 });
 
 test("small finger jitter still produces a tap", () => {
-    const {buttons, fire, touch} = createTouchpadHarness();
+    const {clicks, fire, touch} = createTouchpadHarness();
 
     fire("touchstart", [touch(1, 20, 20)], 0);
     fire("touchmove", [touch(1, 34, 20)], 100);
     fire("touchend", [touch(1, 34, 20)], 150);
 
-    assert.deepEqual(buttons, [
-        {button: 0, press: true},
-        {button: 0, press: false},
-    ]);
+    assert.deepEqual(clicks, [0]);
 });
 
 test("holding before moving starts and finishes a drag", () => {

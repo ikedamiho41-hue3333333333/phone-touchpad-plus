@@ -22,6 +22,8 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 )
@@ -38,5 +40,17 @@ func TestWebdataTypesCompleteness(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNoStorePreventsStalePhoneInterface(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/app/touchpad.mjs", nil)
+	response := httptest.NewRecorder()
+	noStore(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(response, request)
+
+	if got := response.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", got)
 	}
 }

@@ -12,6 +12,7 @@ while [[ $# -gt 0 ]]; do
         *) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
     esac
 done
+
 [[ -x "${binary}" ]] || { printf 'application binary is not executable\n' >&2; exit 1; }
 [[ -r "${secret_file}" ]] || { printf 'secret file is not readable\n' >&2; exit 1; }
 [[ -r "${settings_file}" ]] || { printf 'settings file is not readable\n' >&2; exit 1; }
@@ -41,21 +42,6 @@ fi
     printf 'invalid vertical scroll direction\n' >&2
     exit 1
 }
-[[ -n "${DISPLAY:-}" ]] || { printf 'DISPLAY is unavailable; log in to the X11 desktop first\n' >&2; exit 1; }
-
-if [[ -z "${XAUTHORITY:-}" || ! -r "${XAUTHORITY}" ]]; then
-    if [[ -r "${HOME}/.Xauthority" ]]; then
-        XAUTHORITY="${HOME}/.Xauthority"
-    else
-        runtime_root=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
-        XAUTHORITY=$(find "${runtime_root}" -maxdepth 3 -type f -name '*Xauthority*' -readable -print -quit 2>/dev/null || true)
-    fi
-fi
-[[ -n "${XAUTHORITY:-}" && -r "${XAUTHORITY}" ]] || {
-    printf 'XAUTHORITY is unavailable; log in to the X11 desktop first\n' >&2
-    exit 1
-}
-export DISPLAY XAUTHORITY
 
 exec "${binary}" \
     -bind ":${bind_port}" \

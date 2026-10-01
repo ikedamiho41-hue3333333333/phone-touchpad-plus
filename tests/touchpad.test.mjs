@@ -3,14 +3,16 @@ import test from "node:test";
 
 import Touchpad from "../webdata/app/touchpad.mjs";
 
-const createTouchpadHarness = () => {
+const createTouchpadHarness = (config = {}) => {
     const listeners = new Map();
+    const listenerOptions = new Map();
     const feedback = [];
     globalThis.document = {
-        addEventListener(type, listener) {
+        addEventListener(type, listener, options) {
             const typeListeners = listeners.get(type) || [];
             typeListeners.push(listener);
             listeners.set(type, typeListeners);
+            listenerOptions.set(type, options);
         },
         dispatchEvent(event) {
             feedback.push(event.detail);
@@ -30,15 +32,22 @@ const createTouchpadHarness = () => {
     const gestures = [];
     const scrolls = [];
     const buttons = [];
+    const clicks = [];
     const moves = [];
     const inputController = {
-        gesture(action) { gestures.push(action); },
+        gesture(action) { gestures.push(action); return true; },
         pointerButton(button, press) { buttons.push({button, press}); },
+        pointerClick(button) { clicks.push(button); },
         pointerMove(x, y) { moves.push({x, y}); },
         pointerScroll(x, y, finish) { scrolls.push({x, y, finish}); },
     };
     const target = {};
-    new Touchpad(inputController, () => true).configure({moveSpeed: 1, scrollSpeed: 1});
+    new Touchpad(inputController, () => true).configure({
+        moveSpeed: 1,
+        scrollSpeed: 1,
+        invertScrollY: false,
+        ...config,
+    });
 
     const touch = (identifier, pageX, pageY) => ({identifier, pageX, pageY, target});
     const fire = (type, changedTouches, timeStamp) => {
@@ -46,8 +55,103 @@ const createTouchpadHarness = () => {
             listener({changedTouches, timeStamp, preventDefault() {}});
         }
     };
-    return {buttons, feedback, fire, gestures, moves, scrolls, touch};
+    return {buttons, clicks, feedback, fire, gestures, listenerOptions, moves, scrolls, touch};
 };
+
+test("touch listeners explicitly disable passive mode", () => {
+    const {listenerOptions} = createTouchpadHarness();
+
+    for (const type of ["touchstart", "touchend", "touchcancel", "touchmove"]) {
+        assert.equal(listenerOptions.get(type)?.passive, false, `${type} must be non-passive`);
+    }
+});
+
+test("single-finger tap requests a complete left click", () => {
+    const {buttons, clicks, feedback, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchend", [touch(1, 20, 20)], 100);
+
+    assert.deepEqual(clicks, [0]);
+    assert.deepEqual(buttons, []);
+    assert.deepEqual(feedback, ["单击"]);
+});
+
+test("a relaxed 400ms tap still clicks", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchend", [touch(1, 20, 20)], 400);
+
+    assert.deepEqual(clicks, [0]);
+});
+
+test("small finger jitter still produces a tap", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchmove", [touch(1, 34, 20)], 100);
+    fire("touchend", [touch(1, 34, 20)], 150);
+
+    assert.deepEqual(clicks, [0]);
+});
+
+test("two sequential one-finger taps stay as two left clicks", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchend", [touch(1, 20, 20)], 80);
+    fire("touchstart", [touch(2, 20, 20)], 160);
+    fire("touchend", [touch(2, 20, 20)], 240);
+
+    assert.deepEqual(clicks, [0, 0]);
+});
+
+test("brief accidental second-finger contact does not open a context menu", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchstart", [touch(2, 40, 20)], 80);
+    fire("touchend", [touch(2, 40, 20)], 90);
+    fire("touchend", [touch(1, 20, 20)], 100);
+
+    assert.deepEqual(clicks, []);
+});
+
+test("deliberate two-finger tap still requests a right click", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchstart", [touch(2, 40, 20)], 20);
+    fire("touchend", [touch(1, 20, 20), touch(2, 40, 20)], 100);
+
+    assert.deepEqual(clicks, [1]);
+});
+
+test("holding before moving starts and finishes a drag", () => {
+    const {buttons, fire, moves, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchmove", [touch(1, 40, 20)], 400);
+    fire("touchend", [touch(1, 40, 20)], 450);
+
+    assert.deepEqual(buttons, [
+        {button: 0, press: true},
+        {button: 0, press: false},
+    ]);
+    assert.ok(moves.length > 0);
+});
+
+test("ordinary pointer movement never holds the left button", () => {
+    const {buttons, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchmove", [touch(1, 40, 20)], 100);
+    fire("touchmove", [touch(1, 60, 20)], 400);
+    fire("touchend", [touch(1, 60, 20)], 450);
+
+    assert.deepEqual(buttons, []);
+});
 
 test("two-finger scrolling drift does not emit a zoom gesture", () => {
     const {fire, gestures, scrolls, touch} = createTouchpadHarness();
@@ -58,6 +162,26 @@ test("two-finger scrolling drift does not emit a zoom gesture", () => {
 
     assert.deepEqual(gestures, []);
     assert.ok(scrolls.some(({x, y}) => x !== 0 || y !== 0));
+});
+
+test("vertical scroll inversion preserves the horizontal direction", () => {
+    const scroll = (invertScrollY) => {
+        const harness = createTouchpadHarness({invertScrollY});
+        harness.fire("touchstart", [
+            harness.touch(1, 0, 0),
+            harness.touch(2, 100, 0),
+        ], 0);
+        harness.fire("touchmove", [
+            harness.touch(1, 10, 20),
+            harness.touch(2, 110, 20),
+        ], 300);
+        return harness.scrolls.find(({x, y}) => x != 0 || y != 0);
+    };
+
+    const normal = scroll(false);
+    const inverted = scroll(true);
+    assert.equal(inverted.x, normal.x);
+    assert.equal(inverted.y, -normal.y);
 });
 
 test("opposite two-finger expansion emits zoom in without keyboard text", () => {
@@ -93,11 +217,11 @@ const performThreeFingerSwipe = (deltaX, deltaY) => {
     return harness;
 };
 
-test("three-finger swipe left switches to the next application", () => {
+test("three-finger swipe left switches to the next desktop", () => {
     assert.deepEqual(performThreeFingerSwipe(-60, 0).gestures, [3]); // GestureAppNext
 });
 
-test("three-finger swipe right switches to the previous application", () => {
+test("three-finger swipe right switches to the previous desktop", () => {
     assert.deepEqual(performThreeFingerSwipe(60, 0).gestures, [2]); // GestureAppPrevious
 });
 
@@ -107,4 +231,23 @@ test("three-finger swipe up opens the overview", () => {
 
 test("three-finger swipe down shows the desktop", () => {
     assert.deepEqual(performThreeFingerSwipe(0, 60).gestures, [1]); // GestureShowDesktop
+});
+
+test("three-finger horizontal swipe triggers before release and only once", () => {
+    const harness = createTouchpadHarness();
+    const starts = [
+        harness.touch(1, 0, 0),
+        harness.touch(2, 20, 0),
+        harness.touch(3, 40, 0),
+    ];
+    const ends = starts.map(({identifier, pageX, pageY}) =>
+        harness.touch(identifier, pageX - 60, pageY));
+
+    harness.fire("touchstart", starts, 0);
+    harness.fire("touchmove", ends, 300);
+    assert.deepEqual(harness.gestures, [3]); // GestureAppNext
+    assert.deepEqual(harness.feedback, ["下一个桌面"]);
+
+    harness.fire("touchend", ends, 320);
+    assert.deepEqual(harness.gestures, [3]);
 });

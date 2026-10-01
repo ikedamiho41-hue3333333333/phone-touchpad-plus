@@ -84,6 +84,10 @@ jobs:
         run: shellcheck scripts/*.sh scripts/lib/*.sh skills/phone-touchpad-plus/scripts/*.sh tests/*.sh tests/scripts/*.sh
       - name: Isolated install lifecycle
         run: bash tests/scripts/install_test.sh
+      - name: Portable lifecycle helpers
+        run: bash tests/scripts/common_test.sh
+      - name: Isolated macOS install lifecycle
+        run: bash tests/scripts/install_macos_test.sh
       - name: Read-only doctor lifecycle
         run: bash tests/scripts/doctor_test.sh
       - name: Conservative uninstall lifecycle

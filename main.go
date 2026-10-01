@@ -59,6 +59,7 @@ func writeVersion(w io.Writer) error {
 type config struct {
 	UpdateRate       uint         `json:"updateRate"`
 	ScrollSpeed      float64      `json:"scrollSpeed"`
+	InvertScrollY    bool         `json:"invertScrollY"`
 	MoveSpeed        float64      `json:"moveSpeed"`
 	MouseScrollSpeed float64      `json:"mouseScrollSpeed"`
 	MouseMoveSpeed   float64      `json:"mouseMoveSpeed"`
@@ -74,6 +75,13 @@ func controllerCapabilities(controller inputcontrol.Controller) capabilities {
 	return capabilities{Gestures: gestures}
 }
 
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
 const (
 	commandKeyboardText            byte = 't'
 	commandKeyboardKey             byte = 'k'
@@ -81,6 +89,7 @@ const (
 	commandPointerScrollFinished   byte = 'S'
 	commandPointerMove             byte = 'm'
 	commandPointerButton           byte = 'b'
+	commandPointerClickReset       byte = 'r'
 	commandGesture                 byte = 'g'
 )
 
@@ -158,6 +167,18 @@ func processCommand(controller inputcontrol.Controller, commandWithArg string) e
 			return errors.New("unsupported pointer button")
 		}
 		return controller.PointerButton(button, pressed != 0)
+	case commandPointerClickReset:
+		var button inputcontrol.PointerButton
+		if err := parseInts(arg, (*int)(&button)); err != nil {
+			return err
+		}
+		if button < 0 || button >= inputcontrol.PointerButtonLimit {
+			return errors.New("unsupported pointer button")
+		}
+		if resetter, ok := controller.(inputcontrol.PointerClickSequenceController); ok {
+			resetter.ResetPointerClickSequence(button)
+		}
+		return nil
 	default:
 		return errors.New("unsupported command")
 	}
@@ -204,6 +225,7 @@ func main() {
 	flag.UintVar(&config.UpdateRate, "update-rate", 30, "number of updates per second")
 	flag.Float64Var(&config.MoveSpeed, "move-speed", 1, "move speed multiplier")
 	flag.Float64Var(&config.ScrollSpeed, "scroll-speed", 1, "scroll speed multiplier")
+	flag.BoolVar(&config.InvertScrollY, "invert-scroll-y", false, "invert vertical touchpad scrolling")
 	flag.Float64Var(&config.MouseMoveSpeed, "mouse-move-speed", 1, "mouse move speed multiplier")
 	flag.Float64Var(&config.MouseScrollSpeed, "mouse-scroll-speed", 1, "mouse scroll speed multiplier")
 	flag.Parse()
@@ -294,7 +316,7 @@ func main() {
 	}
 	port := addr.Port
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.FS(webdataFS)))
+	mux.Handle("/", noStore(http.FileServer(http.FS(webdataFS))))
 	mux.Handle("/ws", websocket.Handler(func(ws *websocket.Conn) {
 		var message string
 		challenge := <-authenticationChallenges

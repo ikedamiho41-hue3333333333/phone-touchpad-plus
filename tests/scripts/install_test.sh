@@ -114,6 +114,7 @@ assert_mode "${secret_file}" 600
 assert_mode "${qr_file}" 600
 rg --quiet '^PTP_MOVE_SPEED=1\.0$' "${settings_file}" || fail 'default move speed is not 1.0'
 rg --quiet '^PTP_SCROLL_SPEED=1\.0$' "${settings_file}" || fail 'default scroll speed is not 1.0'
+rg --quiet '^PTP_SCROLL_INVERT_Y=false$' "${settings_file}" || fail 'vertical scrolling is inverted by default'
 rg --quiet -- '--secret-file' "${unit}" || fail 'unit does not reference a secret file'
 secret_value=$(<"${secret_file}")
 if rg --fixed-strings --quiet "${secret_value}" "${unit}"; then

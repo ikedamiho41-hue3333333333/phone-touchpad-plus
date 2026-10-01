@@ -29,6 +29,15 @@ type gestureTestController struct {
 
 func (c *gestureTestController) Gesture(inputcontrol.GestureAction) error { return nil }
 
+type clickSequenceTestController struct {
+	*baseTestController
+	resets []inputcontrol.PointerButton
+}
+
+func (c *clickSequenceTestController) ResetPointerClickSequence(button inputcontrol.PointerButton) {
+	c.resets = append(c.resets, button)
+}
+
 func TestControllerCapabilitiesReflectGestureInterface(t *testing.T) {
 	if got := controllerCapabilities(&baseTestController{}); got.Gestures {
 		t.Fatal("base controller reported gesture support")
@@ -49,5 +58,21 @@ func TestControllerCapabilitiesDoNotBlockBasePointerCommands(t *testing.T) {
 	}
 	if len(controller.moves) != 1 || controller.moves[0] != [2]int{3, -2} {
 		t.Fatalf("pointer moves = %#v, want [[3 -2]]", controller.moves)
+	}
+}
+
+func TestPointerClickSequenceResetCommand(t *testing.T) {
+	controller := &clickSequenceTestController{baseTestController: &baseTestController{}}
+	if err := processCommand(controller, "r0"); err != nil {
+		t.Fatal(err)
+	}
+	if len(controller.resets) != 1 || controller.resets[0] != inputcontrol.PointerButtonLeft {
+		t.Fatalf("pointer resets = %#v, want [left]", controller.resets)
+	}
+}
+
+func TestPointerClickSequenceResetIsOptional(t *testing.T) {
+	if err := processCommand(&baseTestController{}, "r0"); err != nil {
+		t.Fatal(err)
 	}
 }

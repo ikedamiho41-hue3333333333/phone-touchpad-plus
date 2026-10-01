@@ -21,13 +21,33 @@
 
 package inputcontrol
 
-// #cgo LDFLAGS: -framework CoreGraphics
+// #cgo LDFLAGS: -framework CoreGraphics -framework ApplicationServices
+// #include <ApplicationServices/ApplicationServices.h>
 // #include <Carbon/Carbon.h>
 // #include <IOKit/hidsystem/ev_keymap.h>
+//
+// static double phoneTouchpadSystemDoubleClickInterval(void) {
+//     CFPropertyListRef value = CFPreferencesCopyValue(
+//         CFSTR("com.apple.mouse.doubleClickThreshold"),
+//         kCFPreferencesAnyApplication,
+//         kCFPreferencesCurrentUser,
+//         kCFPreferencesAnyHost
+//     );
+//     double seconds = 0;
+//     if (value != NULL && CFGetTypeID(value) == CFNumberGetTypeID()) {
+//         CFNumberGetValue((CFNumberRef)value, kCFNumberDoubleType, &seconds);
+//     }
+//     if (value != NULL) {
+//         CFRelease(value);
+//     }
+//     return seconds;
+// }
 import "C"
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 	"unicode/utf16"
@@ -40,15 +60,87 @@ const (
 	kCGEventData2   C.CGEventField = 0x96
 )
 
-const clickInterval = 500 * time.Millisecond
+const (
+	doubleClickDistanceSquared        = 36.0
+	fallbackDarwinDoubleClickInterval = 500 * time.Millisecond
+)
+
+var errDarwinAccessibilityPermission = errors.New(
+	"macOS Accessibility permission is required for Phone Touchpad Plus",
+)
+
+type darwinPointerButtonState struct {
+	Pressed    bool
+	ClickCount int
+	T          time.Time
+	X          float64
+	Y          float64
+}
+
+func updateDarwinClickState(state *darwinPointerButtonState, press bool,
+	now time.Time, x, y float64, clickInterval time.Duration) int {
+	if !press {
+		state.Pressed = false
+		return min(state.ClickCount, 2)
+	}
+	clickCount := 1
+	delta := now.Sub(state.T)
+	dx := x - state.X
+	dy := y - state.Y
+	if !state.T.IsZero() && state.ClickCount < 2 &&
+		delta >= 0 && delta <= clickInterval &&
+		dx*dx+dy*dy <= doubleClickDistanceSquared {
+		clickCount = state.ClickCount + 1
+	}
+	state.Pressed = true
+	state.ClickCount = clickCount
+	state.T = now
+	state.X = x
+	state.Y = y
+	return clickCount
+}
+
+func darwinDoubleClickIntervalFromSeconds(seconds float64) time.Duration {
+	if math.IsNaN(seconds) || math.IsInf(seconds, 0) || seconds <= 0 || seconds > 2 {
+		return fallbackDarwinDoubleClickInterval
+	}
+	return time.Duration(seconds * float64(time.Second))
+}
+
+func darwinSystemDoubleClickInterval() time.Duration {
+	return darwinDoubleClickIntervalFromSeconds(
+		float64(C.phoneTouchpadSystemDoubleClickInterval()),
+	)
+}
 
 type darwinController struct {
 	eventSrc           C.CGEventSourceRef
+	clickInterval      time.Duration
 	lock               sync.Mutex
-	pointerButtonState [PointerButtonLimit]struct {
-		Pressed    bool
-		ClickCount int
-		T          time.Time
+	pointerButtonState [PointerButtonLimit]darwinPointerButtonState
+}
+
+type darwinShortcut struct {
+	virtualKey C.CGKeyCode
+	flags      C.CGEventFlags
+}
+
+func darwinGestureShortcut(action GestureAction) (darwinShortcut, error) {
+	switch action {
+	case GestureOverview:
+		return darwinShortcut{C.kVK_UpArrow, C.kCGEventFlagMaskControl}, nil
+	case GestureShowDesktop:
+		return darwinShortcut{C.kVK_F3, C.kCGEventFlagMaskCommand}, nil
+	case GestureAppPrevious:
+		return darwinShortcut{C.kVK_LeftArrow, C.kCGEventFlagMaskControl}, nil
+	case GestureAppNext:
+		return darwinShortcut{C.kVK_RightArrow, C.kCGEventFlagMaskControl}, nil
+	case GestureZoomIn:
+		return darwinShortcut{C.kVK_ANSI_Equal, C.kCGEventFlagMaskCommand | C.kCGEventFlagMaskShift}, nil
+	case GestureZoomOut:
+		return darwinShortcut{C.kVK_ANSI_Minus, C.kCGEventFlagMaskCommand}, nil
+	default:
+		return darwinShortcut{}, fmt.Errorf("unsupported gesture action: %#v", action)
 	}
 }
 
@@ -57,6 +149,18 @@ func init() {
 }
 
 func InitDarwinController() (Controller, error) {
+	return initDarwinController(func() bool {
+		if bool(C.CGPreflightPostEventAccess()) {
+			return true
+		}
+		return bool(C.CGRequestPostEventAccess())
+	})
+}
+
+func initDarwinController(hasPostEventAccess func() bool) (Controller, error) {
+	if !hasPostEventAccess() {
+		return nil, errDarwinAccessibilityPermission
+	}
 	eventSrc := C.CGEventSourceCreate(C.kCGEventSourceStatePrivate)
 	if eventSrc == 0 {
 		return nil, &UnsupportedPlatformError{
@@ -64,7 +168,8 @@ func InitDarwinController() (Controller, error) {
 		}
 	}
 	return &darwinController{
-		eventSrc: eventSrc,
+		eventSrc:      eventSrc,
+		clickInterval: darwinSystemDoubleClickInterval(),
 	}, nil
 }
 
@@ -190,6 +295,14 @@ func (p *darwinController) KeyboardKey(key Key) error {
 	}
 }
 
+func (p *darwinController) Gesture(action GestureAction) error {
+	shortcut, err := darwinGestureShortcut(action)
+	if err != nil {
+		return err
+	}
+	return p.sendKeyboardKeyPress(shortcut.virtualKey, shortcut.flags, nil)
+}
+
 func (p *darwinController) mouseLocation() (C.CGPoint, error) {
 	event := C.CGEventCreate(p.eventSrc)
 	if event == 0 {
@@ -228,21 +341,17 @@ func (p *darwinController) PointerButton(button PointerButton, press bool) error
 		return fmt.Errorf("failed to create mouse event")
 	}
 	defer C.CFRelease(C.CFTypeRef(event))
-	clickCount := state.ClickCount
-	if now.After(state.T.Add(clickInterval)) {
-		clickCount = 0
-	}
-	if press {
-		clickCount += 1
-		C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(min(clickCount, 2)))
-	} else {
-		C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(min(state.ClickCount, 2)))
-	}
+	clickCount := updateDarwinClickState(state, press, now,
+		float64(location.x), float64(location.y), p.clickInterval)
+	C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(clickCount))
 	C.CGEventPost(C.kCGHIDEventTap, event)
-	state.Pressed = press
-	state.ClickCount = clickCount
-	state.T = now
 	return nil
+}
+
+func (p *darwinController) ResetPointerClickSequence(button PointerButton) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.pointerButtonState[button] = darwinPointerButtonState{}
 }
 
 func (p *darwinController) PointerMove(deltaX, deltaY int) error {

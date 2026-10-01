@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ikedamiho41.phone-touchpad-plus</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>@RUNNER@</string>
+        <string>--binary</string>
+        <string>@BINARY@</string>
+        <string>--secret-file</string>
+        <string>@SECRET_FILE@</string>
+        <string>--settings</string>
+        <string>@SETTINGS_FILE@</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    <key>StandardOutPath</key>
+    <string>@STDOUT_LOG@</string>
+    <key>StandardErrorPath</key>
+    <string>@STDERR_LOG@</string>
+</dict>
+</plist>

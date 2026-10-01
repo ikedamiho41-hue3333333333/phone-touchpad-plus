@@ -36,6 +36,32 @@ test("gesture capability sends commands and reveals enhanced controls", () => {
     assert.equal(element.hidden, false);
 });
 
+test("pointer click keeps the button down long enough for macOS", async () => {
+    const socket = createSocket();
+    const inputController = new InputController(socket);
+
+    inputController.pointerClick(0);
+    assert.deepEqual(socket.sent, ["r0", "b0;1"]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.deepEqual(socket.sent, ["r0", "b0;1"]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.deepEqual(socket.sent, ["r0", "b0;1", "b0;0"]);
+});
+
+test("explicit double click sends one deliberate two-click sequence", async () => {
+    const socket = createSocket();
+    const inputController = new InputController(socket);
+
+    inputController.pointerDoubleClick(0);
+    assert.deepEqual(socket.sent, ["r0", "b0;1"]);
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    assert.deepEqual(socket.sent, ["r0", "b0;1", "b0;0"]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.deepEqual(socket.sent, ["r0", "b0;1", "b0;0", "b0;1"]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.deepEqual(socket.sent, ["r0", "b0;1", "b0;0", "b0;1", "b0;0"]);
+});
+
 for (const [name, config] of [
     ["explicitly disabled", {updateRate: 0, capabilities: {gestures: false}}],
     ["missing from an older server", {updateRate: 0}],

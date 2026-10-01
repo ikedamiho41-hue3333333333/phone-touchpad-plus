@@ -1,18 +1,18 @@
 # Phone Touchpad Plus 中文指南
 
-Phone Touchpad Plus 可把 iPhone 的 Safari 页面变成 Linux 桌面的触控板和键盘。**v0.1.0** 提供简体中文界面、指针与滚动独立灵敏度、受保护的配对密钥、局域网地址选择，以及接近 GNOME 操作习惯的多指手势。
+Phone Touchpad Plus 可把 iPhone 的 Safari 页面变成 Linux 或 macOS 电脑的触控板和键盘。**v0.1.0** 提供简体中文界面、指针与滚动独立灵敏度、受保护的配对密钥、局域网地址选择，以及多指手势。
 
 本项目基于 [Unrud/remote-touchpad v1.5.5](https://github.com/Unrud/remote-touchpad/tree/v1.5.5)，采用 **GPL-3.0-or-later** 许可证。
 
 ## 支持范围与安全提示
 
-v0.1.0 是仅提供源码的首版，已验证环境为 **Ubuntu 24.04 + GNOME X11**，手机端为 iPhone Safari。
+v0.1.0 是仅提供源码的首版，主要验证环境为 **Ubuntu 24.04 + GNOME X11**，手机端为 iPhone Safari。当前源码还提供 macOS Apple Silicon 安装脚本、LaunchAgent 常驻服务和 macOS 增强手势映射。
 
 只能在家庭等**可信局域网**中使用。连接使用配对密钥和 HMAC 挑战认证，但当前传输**不提供 TLS**；不要在公共 Wi‑Fi 使用，也不要把配对链接、二维码或密钥发到聊天、Issue 或日志中。
 
-Windows、macOS 和 Wayland 当前不支持 Phone Touchpad Plus 增强手势。仓库中的 `desktop/`、`flatpak/`、`snap/` 以及其他平台代码继承自上游，仅作为参考，不是 v0.1.0 已支持的二进制安装渠道。
+Windows 和 Wayland 当前不支持 Phone Touchpad Plus 增强手势。仓库中的 `desktop/`、`flatpak/`、`snap/` 以及其他平台代码继承自上游，仅作为参考，不是 v0.1.0 已支持的二进制安装渠道。
 
-## 安装
+## Ubuntu 24.04 GNOME X11 安装
 
 准备条件：
 
@@ -39,12 +39,46 @@ bash scripts/install.sh
 
 配置目录权限为 `0700`，密钥与设置文件为 `0600`。服务命令行只接收密钥文件路径，不携带密钥正文。
 
+## macOS Apple Silicon 安装
+
+准备条件：
+
+- Go 1.26 或更高版本；
+- Xcode Command Line Tools；
+- Mac 与 iPhone 连接同一个可信局域网。
+
+```bash
+git clone https://github.com/ikedamiho41-hue3333333333/phone-touchpad-plus.git
+cd phone-touchpad-plus
+bash scripts/install-macos.sh --dry-run
+bash scripts/install-macos.sh
+```
+
+安装器会创建与 Linux 版相同的程序、私密配置和二维码目录，并额外创建：
+
+- 常驻服务：`${HOME}/Library/LaunchAgents/com.ikedamiho41.phone-touchpad-plus.plist`；
+- 日志：`${HOME}/Library/Logs/Phone Touchpad Plus/`。
+
+第一次启动时，macOS 会要求输入控制权限。在“系统设置 → 隐私与安全性 → 辅助功能”中添加并允许 `${HOME}/Applications/Phone Touchpad Plus`，服务随后会由 LaunchAgent 自动重试。其他辅助程序位于 `${HOME}/.local/lib/phone-touchpad-plus/`。查看服务状态：
+
+```bash
+launchctl print "gui/$(id -u)/com.ikedamiho41.phone-touchpad-plus"
+```
+
+macOS 手势映射为：三指或四指左右滑切换桌面或全屏空间，上滑打开调度中心，下滑显示桌面，双指捏合向当前应用发送放大或缩小快捷键。应用可以覆盖系统快捷键，因此实际行为以当前 macOS“键盘快捷键”设置为准。
+
 ## iPhone 配对与再次连接
 
 1. 安装完成后，在电脑本地查看安装器给出的二维码文件。
 2. 用 iPhone 相机扫描二维码，点开 Safari 页面。
 3. 页面显示“手机妙控板”且可以移动鼠标后，可在 Safari 分享菜单中选择“添加到主屏幕”。
 4. 手机关闭页面后，再次打开保存的主屏幕入口或原 Safari 标签即可；若页面显示“连接已断开”，点刷新按钮。
+
+macOS 可用以下命令打开二维码：
+
+```bash
+open "${HOME}/.local/share/phone-touchpad-plus/pairing.png"
+```
 
 配对身份保存在 URL 的 fragment 中，不会作为普通 HTTP 请求路径发送，但仍属于秘密。只要没有清除浏览器地址、二维码和电脑端配置，通常不需要重新配对。
 
@@ -53,16 +87,17 @@ bash scripts/install.sh
 | 手机操作 | 电脑行为 |
 |---|---|
 | 一指移动 | 移动指针 |
-| 一指轻点 | 左键 |
+| 一指轻点 | 左键单击；连续轻点也不会自动合并为双击 |
+| 页面底部“双击”按钮 | 左键双击 |
 | 双指轻点 | 右键 |
 | 三指轻点 | 中键 |
 | 双指同向移动 | 横向或纵向滚动 |
 | 双指张开 / 合拢 | 当前应用放大 / 缩小 |
-| 三指或四指左滑 / 右滑 | 在当前工作区切换到下一个 / 上一个应用窗口 |
-| 三指或四指上滑 | 打开 GNOME 活动概览 |
+| 三指或四指左滑 / 右滑 | macOS 切换到下一个 / 上一个桌面或全屏空间；GNOME X11 切换应用窗口 |
+| 三指或四指上滑 | 打开 GNOME 活动概览或 macOS 调度中心 |
 | 三指或四指下滑 | 显示桌面 |
 
-页面底部还有切换应用、活动概览和显示桌面的后备按钮。增强手势仅在服务器声明支持时显示。
+页面底部还有双击、左右切换、活动概览和显示桌面的后备按钮。增强手势仅在服务器声明支持时显示。
 
 ## 分别调节指针与滚动灵敏度
 
@@ -72,13 +107,24 @@ bash scripts/install.sh
 PTP_BIND_PORT=8765
 PTP_MOVE_SPEED=1.5
 PTP_SCROLL_SPEED=1.0
+PTP_SCROLL_INVERT_Y=false
 ```
 
-`PTP_MOVE_SPEED` 只影响鼠标移动，`PTP_SCROLL_SPEED` 只影响双指滚动。修改一个值时保留另一个值和密钥文件。保存后需要重启用户服务：
+`PTP_MOVE_SPEED` 只影响鼠标移动，`PTP_SCROLL_SPEED` 只影响双指滚动。把 `PTP_SCROLL_INVERT_Y` 改为 `true` 可反转双指上下滚动方向，并保持横向方向不变。修改一个值时保留其他值和密钥文件。保存后需要重启用户服务：
 
 ```bash
 systemctl --user restart phone-touchpad-plus.service
 ```
+
+macOS 使用以下命令重启：
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.ikedamiho41.phone-touchpad-plus"
+```
+
+当前 Mac 使用过的无密钥配置模板保存在
+[`config/macos-settings.example.env`](config/macos-settings.example.env)。复制其中的设置时，
+请继续使用安装程序在本机生成的独立 `secret` 文件，不要把该密钥上传到 GitHub。
 
 如果由自动化助手操作，编辑配置和重启都应在获得你的明确授权后执行。
 

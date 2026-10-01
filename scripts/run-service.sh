@@ -19,11 +19,13 @@ done
 bind_port=8765
 move_speed=1.0
 scroll_speed=1.0
+scroll_invert_y=false
 while IFS='=' read -r key value; do
     case "${key}" in
         PTP_BIND_PORT) bind_port=${value} ;;
         PTP_MOVE_SPEED) move_speed=${value} ;;
         PTP_SCROLL_SPEED) scroll_speed=${value} ;;
+        PTP_SCROLL_INVERT_Y) scroll_invert_y=${value} ;;
         ''|'#'*) ;;
         *) printf 'unsupported setting: %s\n' "${key}" >&2; exit 1 ;;
     esac
@@ -35,6 +37,10 @@ if [[ ! "${bind_port}" =~ ^[0-9]+$ ]] || ((bind_port < 1 || bind_port > 65535));
 fi
 [[ "${move_speed}" =~ ^[0-9]+([.][0-9]+)?$ ]] || { printf 'invalid move speed\n' >&2; exit 1; }
 [[ "${scroll_speed}" =~ ^[0-9]+([.][0-9]+)?$ ]] || { printf 'invalid scroll speed\n' >&2; exit 1; }
+[[ "${scroll_invert_y}" == true || "${scroll_invert_y}" == false ]] || {
+    printf 'invalid vertical scroll direction\n' >&2
+    exit 1
+}
 [[ -n "${DISPLAY:-}" ]] || { printf 'DISPLAY is unavailable; log in to the X11 desktop first\n' >&2; exit 1; }
 
 if [[ -z "${XAUTHORITY:-}" || ! -r "${XAUTHORITY}" ]]; then
@@ -56,4 +62,5 @@ exec "${binary}" \
     -secret-file "${secret_file}" \
     -show-pairing=false \
     -move-speed "${move_speed}" \
-    -scroll-speed "${scroll_speed}"
+    -scroll-speed "${scroll_speed}" \
+    -invert-scroll-y="${scroll_invert_y}"

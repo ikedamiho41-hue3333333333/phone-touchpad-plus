@@ -79,6 +79,7 @@ const calculateAccelerationMult = (speed) => {
 export default class Touchpad {
     #moveSpeed = 1;
     #scrollSpeed = 1;
+    #invertScrollY = false;
 
     #moved = false;
     #startTimeStamp = 0;
@@ -111,6 +112,7 @@ export default class Touchpad {
     configure(config) {
         this.#moveSpeed = config.moveSpeed;
         this.#scrollSpeed = config.scrollSpeed;
+        this.#invertScrollY = config.invertScrollY;
     }
 
     #ongoingTouchIndexById(idToFind) {
@@ -423,7 +425,9 @@ export default class Touchpad {
                     }
                 } else if (this.#twoFingerMode == "scroll") {
                     this.#inputController.pointerScroll(
-                        -sumX * this.#scrollSpeed, -sumY * this.#scrollSpeed, false);
+                        -sumX * this.#scrollSpeed,
+                        -sumY * this.#scrollSpeed * (this.#invertScrollY ? -1 : 1),
+                        false);
                 }
                 this.#pinchLastDistance = distance;
             }

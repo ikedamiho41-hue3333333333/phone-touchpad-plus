@@ -106,9 +106,10 @@ open "${HOME}/.local/share/phone-touchpad-plus/pairing.png"
 PTP_BIND_PORT=8765
 PTP_MOVE_SPEED=1.5
 PTP_SCROLL_SPEED=1.0
+PTP_SCROLL_INVERT_Y=false
 ```
 
-`PTP_MOVE_SPEED` 只影响鼠标移动，`PTP_SCROLL_SPEED` 只影响双指滚动。修改一个值时保留另一个值和密钥文件。保存后需要重启用户服务：
+`PTP_MOVE_SPEED` 只影响鼠标移动，`PTP_SCROLL_SPEED` 只影响双指滚动。把 `PTP_SCROLL_INVERT_Y` 改为 `true` 可反转双指上下滚动方向，并保持横向方向不变。修改一个值时保留其他值和密钥文件。保存后需要重启用户服务：
 
 ```bash
 systemctl --user restart phone-touchpad-plus.service

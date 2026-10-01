@@ -123,7 +123,8 @@ if [[ "${upgrade}" == true ]]; then
     install -m 0600 -- "${PTP_SETTINGS_FILE}" "${stage_settings}"
 else
     od -An -N24 -tx1 /dev/urandom | tr -d ' \n' >"${stage_secret}"
-    printf '%s\n' 'PTP_BIND_PORT=8765' 'PTP_MOVE_SPEED=1.0' 'PTP_SCROLL_SPEED=1.0' >"${stage_settings}"
+    printf '%s\n' 'PTP_BIND_PORT=8765' 'PTP_MOVE_SPEED=1.0' 'PTP_SCROLL_SPEED=1.0' \
+        'PTP_SCROLL_INVERT_Y=false' >"${stage_settings}"
     chmod 0600 "${stage_secret}" "${stage_settings}"
 fi
 

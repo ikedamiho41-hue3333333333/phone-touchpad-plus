@@ -138,6 +138,7 @@ assert_mode "${qr_file}" 600
 rg --quiet '^PTP_BIND_PORT=8765$' "${settings_file}" || fail 'default port is not 8765'
 rg --quiet '^PTP_MOVE_SPEED=1\.0$' "${settings_file}" || fail 'default move speed is not 1.0'
 rg --quiet '^PTP_SCROLL_SPEED=1\.0$' "${settings_file}" || fail 'default scroll speed is not 1.0'
+rg --quiet '^PTP_SCROLL_INVERT_Y=false$' "${settings_file}" || fail 'vertical scrolling is inverted by default'
 rg --fixed-strings --quiet "${secret_file}" "${launch_agent}" || fail 'LaunchAgent does not reference the secret file'
 rg --fixed-strings --quiet "${app}" "${launch_agent}" || fail 'LaunchAgent does not reference the bundled executable'
 

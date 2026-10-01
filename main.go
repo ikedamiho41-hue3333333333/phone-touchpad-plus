@@ -59,6 +59,7 @@ func writeVersion(w io.Writer) error {
 type config struct {
 	UpdateRate       uint         `json:"updateRate"`
 	ScrollSpeed      float64      `json:"scrollSpeed"`
+	InvertScrollY    bool         `json:"invertScrollY"`
 	MoveSpeed        float64      `json:"moveSpeed"`
 	MouseScrollSpeed float64      `json:"mouseScrollSpeed"`
 	MouseMoveSpeed   float64      `json:"mouseMoveSpeed"`
@@ -204,6 +205,7 @@ func main() {
 	flag.UintVar(&config.UpdateRate, "update-rate", 30, "number of updates per second")
 	flag.Float64Var(&config.MoveSpeed, "move-speed", 1, "move speed multiplier")
 	flag.Float64Var(&config.ScrollSpeed, "scroll-speed", 1, "scroll speed multiplier")
+	flag.BoolVar(&config.InvertScrollY, "invert-scroll-y", false, "invert vertical touchpad scrolling")
 	flag.Float64Var(&config.MouseMoveSpeed, "mouse-move-speed", 1, "mouse move speed multiplier")
 	flag.Float64Var(&config.MouseScrollSpeed, "mouse-scroll-speed", 1, "mouse scroll speed multiplier")
 	flag.Parse()

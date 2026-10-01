@@ -3,7 +3,7 @@ import test from "node:test";
 
 import Touchpad from "../webdata/app/touchpad.mjs";
 
-const createTouchpadHarness = () => {
+const createTouchpadHarness = (config = {}) => {
     const listeners = new Map();
     const feedback = [];
     globalThis.document = {
@@ -38,7 +38,12 @@ const createTouchpadHarness = () => {
         pointerScroll(x, y, finish) { scrolls.push({x, y, finish}); },
     };
     const target = {};
-    new Touchpad(inputController, () => true).configure({moveSpeed: 1, scrollSpeed: 1});
+    new Touchpad(inputController, () => true).configure({
+        moveSpeed: 1,
+        scrollSpeed: 1,
+        invertScrollY: false,
+        ...config,
+    });
 
     const touch = (identifier, pageX, pageY) => ({identifier, pageX, pageY, target});
     const fire = (type, changedTouches, timeStamp) => {
@@ -95,6 +100,26 @@ test("two-finger scrolling drift does not emit a zoom gesture", () => {
 
     assert.deepEqual(gestures, []);
     assert.ok(scrolls.some(({x, y}) => x !== 0 || y !== 0));
+});
+
+test("vertical scroll inversion preserves the horizontal direction", () => {
+    const scroll = (invertScrollY) => {
+        const harness = createTouchpadHarness({invertScrollY});
+        harness.fire("touchstart", [
+            harness.touch(1, 0, 0),
+            harness.touch(2, 100, 0),
+        ], 0);
+        harness.fire("touchmove", [
+            harness.touch(1, 10, 20),
+            harness.touch(2, 110, 20),
+        ], 300);
+        return harness.scrolls.find(({x, y}) => x != 0 || y != 0);
+    };
+
+    const normal = scroll(false);
+    const inverted = scroll(true);
+    assert.equal(inverted.x, normal.x);
+    assert.equal(inverted.y, -normal.y);
 });
 
 test("opposite two-finger expansion emits zoom in without keyboard text", () => {

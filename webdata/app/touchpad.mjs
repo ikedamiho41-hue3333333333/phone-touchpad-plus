@@ -111,10 +111,11 @@ export default class Touchpad {
     constructor(inputController, checkAllowedCallback) {
         this.#inputController = inputController;
         this.#checkAllowedCallback = checkAllowedCallback;
-        document.addEventListener("touchstart", this.#handleTouchstart.bind(this));
-        document.addEventListener("touchend", this.#handleTouchend.bind(this));
-        document.addEventListener("touchcancel", this.#handleTouchend.bind(this));
-        document.addEventListener("touchmove", this.#handleTouchmove.bind(this));
+        const touchListenerOptions = {passive: false};
+        document.addEventListener("touchstart", this.#handleTouchstart.bind(this), touchListenerOptions);
+        document.addEventListener("touchend", this.#handleTouchend.bind(this), touchListenerOptions);
+        document.addEventListener("touchcancel", this.#handleTouchend.bind(this), touchListenerOptions);
+        document.addEventListener("touchmove", this.#handleTouchmove.bind(this), touchListenerOptions);
     }
 
     configure(config) {

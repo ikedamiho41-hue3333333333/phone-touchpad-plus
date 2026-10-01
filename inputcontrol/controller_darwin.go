@@ -25,11 +25,29 @@ package inputcontrol
 // #include <ApplicationServices/ApplicationServices.h>
 // #include <Carbon/Carbon.h>
 // #include <IOKit/hidsystem/ev_keymap.h>
+//
+// static double phoneTouchpadSystemDoubleClickInterval(void) {
+//     CFPropertyListRef value = CFPreferencesCopyValue(
+//         CFSTR("com.apple.mouse.doubleClickThreshold"),
+//         kCFPreferencesAnyApplication,
+//         kCFPreferencesCurrentUser,
+//         kCFPreferencesAnyHost
+//     );
+//     double seconds = 0;
+//     if (value != NULL && CFGetTypeID(value) == CFNumberGetTypeID()) {
+//         CFNumberGetValue((CFNumberRef)value, kCFNumberDoubleType, &seconds);
+//     }
+//     if (value != NULL) {
+//         CFRelease(value);
+//     }
+//     return seconds;
+// }
 import "C"
 
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 	"unicode/utf16"
@@ -43,8 +61,8 @@ const (
 )
 
 const (
-	clickInterval              = 320 * time.Millisecond
-	doubleClickDistanceSquared = 36.0
+	doubleClickDistanceSquared        = 36.0
+	fallbackDarwinDoubleClickInterval = 500 * time.Millisecond
 )
 
 var errDarwinAccessibilityPermission = errors.New(
@@ -60,7 +78,7 @@ type darwinPointerButtonState struct {
 }
 
 func updateDarwinClickState(state *darwinPointerButtonState, press bool,
-	now time.Time, x, y float64) int {
+	now time.Time, x, y float64, clickInterval time.Duration) int {
 	if !press {
 		state.Pressed = false
 		return min(state.ClickCount, 2)
@@ -82,8 +100,22 @@ func updateDarwinClickState(state *darwinPointerButtonState, press bool,
 	return clickCount
 }
 
+func darwinDoubleClickIntervalFromSeconds(seconds float64) time.Duration {
+	if math.IsNaN(seconds) || math.IsInf(seconds, 0) || seconds <= 0 || seconds > 2 {
+		return fallbackDarwinDoubleClickInterval
+	}
+	return time.Duration(seconds * float64(time.Second))
+}
+
+func darwinSystemDoubleClickInterval() time.Duration {
+	return darwinDoubleClickIntervalFromSeconds(
+		float64(C.phoneTouchpadSystemDoubleClickInterval()),
+	)
+}
+
 type darwinController struct {
 	eventSrc           C.CGEventSourceRef
+	clickInterval      time.Duration
 	lock               sync.Mutex
 	pointerButtonState [PointerButtonLimit]darwinPointerButtonState
 }
@@ -136,7 +168,8 @@ func initDarwinController(hasPostEventAccess func() bool) (Controller, error) {
 		}
 	}
 	return &darwinController{
-		eventSrc: eventSrc,
+		eventSrc:      eventSrc,
+		clickInterval: darwinSystemDoubleClickInterval(),
 	}, nil
 }
 
@@ -309,7 +342,7 @@ func (p *darwinController) PointerButton(button PointerButton, press bool) error
 	}
 	defer C.CFRelease(C.CFTypeRef(event))
 	clickCount := updateDarwinClickState(state, press, now,
-		float64(location.x), float64(location.y))
+		float64(location.x), float64(location.y), p.clickInterval)
 	C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(clickCount))
 	C.CGEventPost(C.kCGHIDEventTap, event)
 	return nil

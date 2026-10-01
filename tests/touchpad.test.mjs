@@ -5,12 +5,14 @@ import Touchpad from "../webdata/app/touchpad.mjs";
 
 const createTouchpadHarness = (config = {}) => {
     const listeners = new Map();
+    const listenerOptions = new Map();
     const feedback = [];
     globalThis.document = {
-        addEventListener(type, listener) {
+        addEventListener(type, listener, options) {
             const typeListeners = listeners.get(type) || [];
             typeListeners.push(listener);
             listeners.set(type, typeListeners);
+            listenerOptions.set(type, options);
         },
         dispatchEvent(event) {
             feedback.push(event.detail);
@@ -53,8 +55,16 @@ const createTouchpadHarness = (config = {}) => {
             listener({changedTouches, timeStamp, preventDefault() {}});
         }
     };
-    return {buttons, clicks, feedback, fire, gestures, moves, scrolls, touch};
+    return {buttons, clicks, feedback, fire, gestures, listenerOptions, moves, scrolls, touch};
 };
+
+test("touch listeners explicitly disable passive mode", () => {
+    const {listenerOptions} = createTouchpadHarness();
+
+    for (const type of ["touchstart", "touchend", "touchcancel", "touchmove"]) {
+        assert.equal(listenerOptions.get(type)?.passive, false, `${type} must be non-passive`);
+    }
+});
 
 test("single-finger tap requests a complete left click", () => {
     const {buttons, clicks, feedback, fire, touch} = createTouchpadHarness();

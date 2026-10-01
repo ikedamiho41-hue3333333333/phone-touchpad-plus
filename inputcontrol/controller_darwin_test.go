@@ -62,11 +62,11 @@ func TestDarwinGestureShortcutRejectsUnknownAction(t *testing.T) {
 func TestDarwinClickCountRequiresNearbyTap(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)
-	if got := updateDarwinClickState(&state, true, start, 10, 10); got != 1 {
+	if got := updateDarwinClickState(&state, true, start, 10, 10, 500*time.Millisecond); got != 1 {
 		t.Fatalf("first click count = %d, want 1", got)
 	}
-	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
-	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 100, 10); got != 1 {
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10, 500*time.Millisecond)
+	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 100, 10, 500*time.Millisecond); got != 1 {
 		t.Fatalf("moved click count = %d, want 1", got)
 	}
 }
@@ -74,9 +74,9 @@ func TestDarwinClickCountRequiresNearbyTap(t *testing.T) {
 func TestDarwinClickCountRecognizesNearbyDoubleTap(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)
-	updateDarwinClickState(&state, true, start, 10, 10)
-	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
-	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 13, 12); got != 2 {
+	updateDarwinClickState(&state, true, start, 10, 10, 500*time.Millisecond)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10, 500*time.Millisecond)
+	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 13, 12, 500*time.Millisecond); got != 2 {
 		t.Fatalf("nearby click count = %d, want 2", got)
 	}
 }
@@ -84,11 +84,11 @@ func TestDarwinClickCountRecognizesNearbyDoubleTap(t *testing.T) {
 func TestDarwinClickCountStartsFreshAfterDoubleTap(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)
-	updateDarwinClickState(&state, true, start, 10, 10)
-	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
-	updateDarwinClickState(&state, true, start.Add(180*time.Millisecond), 10, 10)
-	updateDarwinClickState(&state, false, start.Add(220*time.Millisecond), 10, 10)
-	if got := updateDarwinClickState(&state, true, start.Add(300*time.Millisecond), 10, 10); got != 1 {
+	updateDarwinClickState(&state, true, start, 10, 10, 320*time.Millisecond)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10, 320*time.Millisecond)
+	updateDarwinClickState(&state, true, start.Add(180*time.Millisecond), 10, 10, 320*time.Millisecond)
+	updateDarwinClickState(&state, false, start.Add(220*time.Millisecond), 10, 10, 320*time.Millisecond)
+	if got := updateDarwinClickState(&state, true, start.Add(300*time.Millisecond), 10, 10, 320*time.Millisecond); got != 1 {
 		t.Fatalf("click after completed double tap = %d, want 1", got)
 	}
 }
@@ -96,19 +96,46 @@ func TestDarwinClickCountStartsFreshAfterDoubleTap(t *testing.T) {
 func TestDarwinClickCountDoesNotMergeSlowTaps(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)
-	updateDarwinClickState(&state, true, start, 10, 10)
-	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
-	if got := updateDarwinClickState(&state, true, start.Add(400*time.Millisecond), 10, 10); got != 1 {
+	updateDarwinClickState(&state, true, start, 10, 10, 320*time.Millisecond)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10, 320*time.Millisecond)
+	if got := updateDarwinClickState(&state, true, start.Add(400*time.Millisecond), 10, 10, 320*time.Millisecond); got != 1 {
 		t.Fatalf("slow second click count = %d, want 1", got)
 	}
+}
+
+func TestDarwinClickCountRespectsConfiguredSystemInterval(t *testing.T) {
+	var state darwinPointerButtonState
+	start := time.Unix(100, 0)
+	updateDarwinClickState(&state, true, start, 10, 10, 150*time.Millisecond)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10, 150*time.Millisecond)
+	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 10, 10, 150*time.Millisecond); got != 1 {
+		t.Fatalf("click outside system interval = %d, want 1", got)
+	}
+}
+
+func TestDarwinDoubleClickIntervalFromSeconds(t *testing.T) {
+	if got := darwinDoubleClickIntervalFromSeconds(0.15); got != 150*time.Millisecond {
+		t.Fatalf("system interval = %s, want 150ms", got)
+	}
+	if got := darwinDoubleClickIntervalFromSeconds(0); got != fallbackDarwinDoubleClickInterval {
+		t.Fatalf("fallback interval = %s, want %s", got, fallbackDarwinDoubleClickInterval)
+	}
+}
+
+func TestDarwinSystemDoubleClickIntervalIsUsable(t *testing.T) {
+	interval := darwinSystemDoubleClickInterval()
+	if interval <= 0 || interval > 2*time.Second {
+		t.Fatalf("system double-click interval = %s, want a usable duration", interval)
+	}
+	t.Logf("system double-click interval: %s", interval)
 }
 
 func TestDarwinClickCountUsesPressTime(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)
-	updateDarwinClickState(&state, true, start, 10, 10)
-	updateDarwinClickState(&state, false, start.Add(450*time.Millisecond), 10, 10)
-	if got := updateDarwinClickState(&state, true, start.Add(600*time.Millisecond), 10, 10); got != 1 {
+	updateDarwinClickState(&state, true, start, 10, 10, 500*time.Millisecond)
+	updateDarwinClickState(&state, false, start.Add(450*time.Millisecond), 10, 10, 500*time.Millisecond)
+	if got := updateDarwinClickState(&state, true, start.Add(600*time.Millisecond), 10, 10, 500*time.Millisecond); got != 1 {
 		t.Fatalf("late second click count = %d, want 1", got)
 	}
 }

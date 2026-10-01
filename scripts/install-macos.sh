@@ -27,9 +27,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 ptp_resolve_paths "${prefix}"
-PTP_LEGACY_APP="${PTP_APP}"
+PTP_LEGACY_PREFIX_APP="${PTP_APP}"
 PTP_APPLICATIONS_DIR="${HOME}/Applications"
-PTP_APP="${PTP_APPLICATIONS_DIR}/Phone Touchpad Plus"
+PTP_LEGACY_MACOS_APP="${PTP_APPLICATIONS_DIR}/Phone Touchpad Plus"
+PTP_APP_BUNDLE="${PTP_APPLICATIONS_DIR}/Phone Touchpad Plus.app"
+PTP_APP="${PTP_APP_BUNDLE}/Contents/MacOS/phone-touchpad-plus"
 PTP_RUNNER="${PTP_INSTALL_DIR}/run-service-macos.sh"
 PTP_LAUNCH_AGENT_DIR="${HOME}/Library/LaunchAgents"
 PTP_LAUNCH_AGENT_FILE="${PTP_LAUNCH_AGENT_DIR}/${launch_agent_label}.plist"
@@ -40,12 +42,13 @@ PTP_STDERR_LOG="${PTP_LOG_DIR}/service-error.log"
 if [[ "${dry_run}" == true ]]; then
     printf 'Dry run; no files or services will be changed.\n'
     printf 'Application: %s\nConfig: %s\nData: %s\nLaunchAgent: %s\n' \
-        "${PTP_APP}" "${PTP_CONFIG_DIR}" "${PTP_DATA_DIR}" "${PTP_LAUNCH_AGENT_FILE}"
+        "${PTP_APP_BUNDLE}" "${PTP_CONFIG_DIR}" "${PTP_DATA_DIR}" "${PTP_LAUNCH_AGENT_FILE}"
     exit 0
 fi
 
 installation_exists=false
-for existing_path in "${PTP_APP}" "${PTP_LEGACY_APP}" "${PTP_CONFIG_DIR}" "${PTP_LAUNCH_AGENT_FILE}"; do
+for existing_path in "${PTP_APP_BUNDLE}" "${PTP_LEGACY_MACOS_APP}" \
+    "${PTP_LEGACY_PREFIX_APP}" "${PTP_CONFIG_DIR}" "${PTP_LAUNCH_AGENT_FILE}"; do
     [[ -e "${existing_path}" ]] && installation_exists=true
 done
 if [[ "${installation_exists}" == true && "${upgrade}" != true ]]; then
@@ -63,7 +66,7 @@ launchctl_command=${PTP_LAUNCHCTL:-launchctl}
 ptp_require_command "${go_command}"
 ptp_require_command "${codesign_command}"
 ptp_require_command "${launchctl_command}"
-for command_name in awk curl head install mktemp od sed tr; do
+for command_name in awk cp curl head install mktemp mv od sed tr; do
     ptp_require_command "${command_name}"
 done
 
@@ -86,7 +89,10 @@ cleanup_stage() {
 }
 trap cleanup_stage EXIT INT TERM
 
-stage_app="${stage_dir}/phone-touchpad-plus"
+stage_app_bundle="${stage_dir}/Phone Touchpad Plus.app"
+stage_app_contents="${stage_app_bundle}/Contents"
+stage_app="${stage_app_contents}/MacOS/phone-touchpad-plus"
+stage_app_info="${stage_app_contents}/Info.plist"
 stage_qr_helper="${stage_dir}/phone-touchpad-plus-makeqr"
 stage_probe="${stage_dir}/phone-touchpad-plus-probe"
 stage_runner="${stage_dir}/run-service-macos.sh"
@@ -96,12 +102,14 @@ stage_launch_agent="${stage_dir}/${launch_agent_label}.plist"
 stage_qr="${stage_dir}/pairing.png"
 
 cd "${repo_root}"
+install -d -m 0755 "${stage_app_contents}/MacOS"
+install -m 0644 -- "${script_dir}/templates/phone-touchpad-plus.Info.plist" "${stage_app_info}"
 "${go_command}" build -trimpath -o "${stage_app}" .
 "${go_command}" build -trimpath -o "${stage_qr_helper}" ./tools/makeqr
 "${go_command}" build -trimpath -o "${stage_probe}" ./tools/probe
 "${codesign_command}" --force --sign - --identifier "${launch_agent_label}" \
-    --requirements "${code_requirement}" "${stage_app}"
-"${codesign_command}" --verify --strict "${stage_app}"
+    --requirements "${code_requirement}" "${stage_app_bundle}"
+"${codesign_command}" --verify --strict "${stage_app_bundle}"
 [[ "$("${stage_app}" -version)" == 0.1.0 ]] || { ptp_die 'staged application version check failed'; exit 1; }
 "${stage_probe}" -help >/dev/null 2>&1 || { ptp_die 'staged probe validation failed'; exit 1; }
 if "${stage_qr_helper}" </dev/null >/dev/null 2>&1; then
@@ -155,7 +163,19 @@ printf '%s#%s\n' "${pairing_address}" "${secret_value}" | "${stage_qr_helper}" "
 
 install -d -m 0755 "${PTP_INSTALL_DIR}" "${PTP_APPLICATIONS_DIR}" "${PTP_LAUNCH_AGENT_DIR}" "${PTP_LOG_DIR}"
 install -d -m 0700 "${PTP_CONFIG_DIR}" "${PTP_DATA_DIR}"
-ptp_atomic_install "${stage_app}" "${PTP_APP}" 0755
+bundle_install_dir=$(mktemp -d "${PTP_APPLICATIONS_DIR}/.phone-touchpad-plus-app.XXXXXXXX")
+bundle_install_stage="${bundle_install_dir}/Phone Touchpad Plus.app"
+bundle_install_backup="${bundle_install_dir}/previous.app"
+cp -R -- "${stage_app_bundle}" "${bundle_install_stage}"
+if [[ -e "${PTP_APP_BUNDLE}" ]]; then
+    mv -- "${PTP_APP_BUNDLE}" "${bundle_install_backup}"
+fi
+if ! mv -- "${bundle_install_stage}" "${PTP_APP_BUNDLE}"; then
+    [[ ! -e "${bundle_install_backup}" ]] || mv -- "${bundle_install_backup}" "${PTP_APP_BUNDLE}"
+    ptp_die 'failed to install the macOS application bundle'
+    exit 1
+fi
+rm -rf -- "${bundle_install_backup}" "${bundle_install_dir}"
 ptp_atomic_install "${stage_qr_helper}" "${PTP_QR_HELPER}" 0755
 ptp_atomic_install "${stage_probe}" "${PTP_PROBE}" 0755
 ptp_atomic_install "${stage_runner}" "${PTP_RUNNER}" 0755
@@ -163,9 +183,7 @@ ptp_atomic_install "${stage_secret}" "${PTP_SECRET_FILE}" 0600
 ptp_atomic_install "${stage_settings}" "${PTP_SETTINGS_FILE}" 0600
 ptp_atomic_install "${stage_launch_agent}" "${PTP_LAUNCH_AGENT_FILE}" 0644
 ptp_atomic_install "${stage_qr}" "${PTP_QR_FILE}" 0600
-if [[ "${PTP_LEGACY_APP}" != "${PTP_APP}" ]]; then
-    rm -f -- "${PTP_LEGACY_APP}"
-fi
+rm -f -- "${PTP_LEGACY_MACOS_APP}" "${PTP_LEGACY_PREFIX_APP}"
 
 launch_domain="gui/$(id -u)"
 "${launchctl_command}" bootout "${launch_domain}/${launch_agent_label}" >/dev/null 2>&1 || true

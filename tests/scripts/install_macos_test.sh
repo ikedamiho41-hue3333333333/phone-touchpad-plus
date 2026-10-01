@@ -106,8 +106,11 @@ make_test_commands "${install_root}"
 run_install "${install_root}" >"${install_root}/output"
 
 install_dir="${install_root}/prefix/lib/phone-touchpad-plus"
-app="${install_root}/test-home/Applications/Phone Touchpad Plus"
-legacy_app="${install_dir}/phone-touchpad-plus"
+app_bundle="${install_root}/test-home/Applications/Phone Touchpad Plus.app"
+app="${app_bundle}/Contents/MacOS/phone-touchpad-plus"
+app_info="${app_bundle}/Contents/Info.plist"
+legacy_app="${install_root}/test-home/Applications/Phone Touchpad Plus"
+legacy_prefix_app="${install_dir}/phone-touchpad-plus"
 qr_helper="${install_dir}/phone-touchpad-plus-makeqr"
 probe="${install_dir}/phone-touchpad-plus-probe"
 runner="${install_dir}/run-service-macos.sh"
@@ -117,11 +120,17 @@ settings_file="${config_dir}/settings.env"
 launch_agent="${install_root}/test-home/Library/LaunchAgents/com.ikedamiho41.phone-touchpad-plus.plist"
 qr_file="${install_root}/data/phone-touchpad-plus/pairing.png"
 
-for file in "${app}" "${qr_helper}" "${probe}" "${runner}" "${secret_file}" \
+[[ -d "${app_bundle}" ]] || fail 'macOS application bundle is missing'
+for file in "${app}" "${app_info}" "${qr_helper}" "${probe}" "${runner}" "${secret_file}" \
     "${settings_file}" "${launch_agent}" "${qr_file}"; do
     assert_file "${file}"
 done
 [[ ! -e "${legacy_app}" ]] || fail 'legacy macOS application name remains installed'
+[[ ! -e "${legacy_prefix_app}" ]] || fail 'legacy prefix application remains installed'
+rg --fixed-strings --quiet '<string>com.ikedamiho41.phone-touchpad-plus</string>' "${app_info}" || \
+    fail 'application bundle identifier is missing'
+rg --fixed-strings --quiet '<string>phone-touchpad-plus</string>' "${app_info}" || \
+    fail 'application bundle executable is missing'
 assert_mode "${config_dir}" 700
 assert_mode "${secret_file}" 600
 assert_mode "${settings_file}" 600
@@ -130,6 +139,7 @@ rg --quiet '^PTP_BIND_PORT=8765$' "${settings_file}" || fail 'default port is no
 rg --quiet '^PTP_MOVE_SPEED=1\.0$' "${settings_file}" || fail 'default move speed is not 1.0'
 rg --quiet '^PTP_SCROLL_SPEED=1\.0$' "${settings_file}" || fail 'default scroll speed is not 1.0'
 rg --fixed-strings --quiet "${secret_file}" "${launch_agent}" || fail 'LaunchAgent does not reference the secret file'
+rg --fixed-strings --quiet "${app}" "${launch_agent}" || fail 'LaunchAgent does not reference the bundled executable'
 
 secret_value=$(<"${secret_file}")
 if rg --fixed-strings --quiet "${secret_value}" "${launch_agent}" "${install_root}/output"; then
@@ -144,5 +154,7 @@ rg --quiet 'codesign --force --sign - --identifier com\.ikedamiho41\.phone-touch
 rg --fixed-strings --quiet \
     'designated => identifier "com.ikedamiho41.phone-touchpad-plus"' \
     "${install_root}/codesign.log" || fail 'application signature requirement is not stable across upgrades'
+rg --fixed-strings --quiet 'Phone Touchpad Plus.app' "${install_root}/codesign.log" || \
+    fail 'installer did not sign the application bundle'
 
 printf 'isolated macOS install lifecycle tests passed\n'

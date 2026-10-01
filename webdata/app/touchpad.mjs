@@ -333,6 +333,13 @@ export default class Touchpad {
                     button = POINTER_BUTTON_MIDDLE;
                 }
                 this.#inputController.pointerClick(button);
+                if (button == POINTER_BUTTON_LEFT) {
+                    this.#feedback("单击");
+                } else if (button == POINTER_BUTTON_RIGHT) {
+                    this.#feedback("右键");
+                } else if (button == POINTER_BUTTON_MIDDLE) {
+                    this.#feedback("中键");
+                }
             }
             this.#releasedCount = 0;
             this.#dragCandidate = false;

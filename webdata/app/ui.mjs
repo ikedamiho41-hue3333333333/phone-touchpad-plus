@@ -20,6 +20,7 @@
 import Keyboard from "./keyboard.mjs";
 import Mouse from "./mouse.mjs";
 import Touchpad from "./touchpad.mjs";
+import {allowsTouchpadInput} from "./touch-target.mjs";
 import {applyGestureCapability} from "./capabilities.mjs";
 import * as compat from "./compat.mjs";
 
@@ -56,8 +57,7 @@ export default class UI {
         this.#mouse = new Mouse(inputController, mouseScene);
         this.#keyboard = new Keyboard(inputController,
             () => this.#activeScene?.classList.contains("keyboard-input"));
-        this.#touchpad = new Touchpad(inputController,
-            (target) => target.classList.contains("touch-input"));
+        this.#touchpad = new Touchpad(inputController, allowsTouchpadInput);
         document.addEventListener("mousedown", this.#handleMousedown.bind(this));
         document.addEventListener("touchend", this.#handleTouchend.bind(this));
         document.addEventListener("gesturefeedback", this.#handleGestureFeedback.bind(this));

@@ -57,13 +57,14 @@ const createTouchpadHarness = (config = {}) => {
 };
 
 test("single-finger tap requests a complete left click", () => {
-    const {buttons, clicks, fire, touch} = createTouchpadHarness();
+    const {buttons, clicks, feedback, fire, touch} = createTouchpadHarness();
 
     fire("touchstart", [touch(1, 20, 20)], 0);
     fire("touchend", [touch(1, 20, 20)], 100);
 
     assert.deepEqual(clicks, [0]);
     assert.deepEqual(buttons, []);
+    assert.deepEqual(feedback, ["单击"]);
 });
 
 test("a relaxed 400ms tap still clicks", () => {

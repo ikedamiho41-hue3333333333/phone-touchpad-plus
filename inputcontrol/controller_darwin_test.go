@@ -81,6 +81,28 @@ func TestDarwinClickCountRecognizesNearbyDoubleTap(t *testing.T) {
 	}
 }
 
+func TestDarwinClickCountStartsFreshAfterDoubleTap(t *testing.T) {
+	var state darwinPointerButtonState
+	start := time.Unix(100, 0)
+	updateDarwinClickState(&state, true, start, 10, 10)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
+	updateDarwinClickState(&state, true, start.Add(180*time.Millisecond), 10, 10)
+	updateDarwinClickState(&state, false, start.Add(220*time.Millisecond), 10, 10)
+	if got := updateDarwinClickState(&state, true, start.Add(300*time.Millisecond), 10, 10); got != 1 {
+		t.Fatalf("click after completed double tap = %d, want 1", got)
+	}
+}
+
+func TestDarwinClickCountDoesNotMergeSlowTaps(t *testing.T) {
+	var state darwinPointerButtonState
+	start := time.Unix(100, 0)
+	updateDarwinClickState(&state, true, start, 10, 10)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
+	if got := updateDarwinClickState(&state, true, start.Add(400*time.Millisecond), 10, 10); got != 1 {
+		t.Fatalf("slow second click count = %d, want 1", got)
+	}
+}
+
 func TestDarwinClickCountUsesPressTime(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)

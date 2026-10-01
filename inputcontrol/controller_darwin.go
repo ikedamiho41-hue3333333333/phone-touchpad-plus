@@ -43,7 +43,7 @@ const (
 )
 
 const (
-	clickInterval              = 500 * time.Millisecond
+	clickInterval              = 320 * time.Millisecond
 	doubleClickDistanceSquared = 36.0
 )
 
@@ -69,9 +69,10 @@ func updateDarwinClickState(state *darwinPointerButtonState, press bool,
 	delta := now.Sub(state.T)
 	dx := x - state.X
 	dy := y - state.Y
-	if !state.T.IsZero() && delta >= 0 && delta <= clickInterval &&
+	if !state.T.IsZero() && state.ClickCount < 2 &&
+		delta >= 0 && delta <= clickInterval &&
 		dx*dx+dy*dy <= doubleClickDistanceSquared {
-		clickCount = min(state.ClickCount+1, 2)
+		clickCount = state.ClickCount + 1
 	}
 	state.Pressed = true
 	state.ClickCount = clickCount

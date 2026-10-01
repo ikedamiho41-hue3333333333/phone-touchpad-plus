@@ -121,6 +121,10 @@ macOS 使用以下命令重启：
 launchctl kickstart -k "gui/$(id -u)/com.ikedamiho41.phone-touchpad-plus"
 ```
 
+当前 Mac 使用过的无密钥配置模板保存在
+[`config/macos-settings.example.env`](config/macos-settings.example.env)。复制其中的设置时，
+请继续使用安装程序在本机生成的独立 `secret` 文件，不要把该密钥上传到 GitHub。
+
 如果由自动化助手操作，编辑配置和重启都应在获得你的明确授权后执行。
 
 ## 状态与诊断

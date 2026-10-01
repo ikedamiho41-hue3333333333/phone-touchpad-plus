@@ -42,20 +42,49 @@ const (
 	kCGEventData2   C.CGEventField = 0x96
 )
 
-const clickInterval = 500 * time.Millisecond
+const (
+	clickInterval              = 500 * time.Millisecond
+	doubleClickDistanceSquared = 36.0
+)
 
 var errDarwinAccessibilityPermission = errors.New(
 	"macOS Accessibility permission is required for Phone Touchpad Plus",
 )
 
+type darwinPointerButtonState struct {
+	Pressed    bool
+	ClickCount int
+	T          time.Time
+	X          float64
+	Y          float64
+}
+
+func updateDarwinClickState(state *darwinPointerButtonState, press bool,
+	now time.Time, x, y float64) int {
+	if !press {
+		state.Pressed = false
+		return min(state.ClickCount, 2)
+	}
+	clickCount := 1
+	delta := now.Sub(state.T)
+	dx := x - state.X
+	dy := y - state.Y
+	if !state.T.IsZero() && delta >= 0 && delta <= clickInterval &&
+		dx*dx+dy*dy <= doubleClickDistanceSquared {
+		clickCount = min(state.ClickCount+1, 2)
+	}
+	state.Pressed = true
+	state.ClickCount = clickCount
+	state.T = now
+	state.X = x
+	state.Y = y
+	return clickCount
+}
+
 type darwinController struct {
 	eventSrc           C.CGEventSourceRef
 	lock               sync.Mutex
-	pointerButtonState [PointerButtonLimit]struct {
-		Pressed    bool
-		ClickCount int
-		T          time.Time
-	}
+	pointerButtonState [PointerButtonLimit]darwinPointerButtonState
 }
 
 type darwinShortcut struct {
@@ -278,20 +307,10 @@ func (p *darwinController) PointerButton(button PointerButton, press bool) error
 		return fmt.Errorf("failed to create mouse event")
 	}
 	defer C.CFRelease(C.CFTypeRef(event))
-	clickCount := state.ClickCount
-	if now.After(state.T.Add(clickInterval)) {
-		clickCount = 0
-	}
-	if press {
-		clickCount += 1
-		C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(min(clickCount, 2)))
-	} else {
-		C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(min(state.ClickCount, 2)))
-	}
+	clickCount := updateDarwinClickState(state, press, now,
+		float64(location.x), float64(location.y))
+	C.CGEventSetIntegerValueField(event, C.kCGMouseEventClickState, C.int64_t(clickCount))
 	C.CGEventPost(C.kCGHIDEventTap, event)
-	state.Pressed = press
-	state.ClickCount = clickCount
-	state.T = now
 	return nil
 }
 

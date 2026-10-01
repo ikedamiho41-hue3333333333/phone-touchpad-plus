@@ -5,6 +5,7 @@ package inputcontrol
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestInitDarwinControllerRejectsMissingAccessibilityPermission(t *testing.T) {
@@ -55,5 +56,37 @@ func TestDarwinGestureShortcuts(t *testing.T) {
 func TestDarwinGestureShortcutRejectsUnknownAction(t *testing.T) {
 	if _, err := darwinGestureShortcut(GestureLimit); err == nil {
 		t.Fatal("darwinGestureShortcut() succeeded for an unknown action")
+	}
+}
+
+func TestDarwinClickCountRequiresNearbyTap(t *testing.T) {
+	var state darwinPointerButtonState
+	start := time.Unix(100, 0)
+	if got := updateDarwinClickState(&state, true, start, 10, 10); got != 1 {
+		t.Fatalf("first click count = %d, want 1", got)
+	}
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
+	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 100, 10); got != 1 {
+		t.Fatalf("moved click count = %d, want 1", got)
+	}
+}
+
+func TestDarwinClickCountRecognizesNearbyDoubleTap(t *testing.T) {
+	var state darwinPointerButtonState
+	start := time.Unix(100, 0)
+	updateDarwinClickState(&state, true, start, 10, 10)
+	updateDarwinClickState(&state, false, start.Add(40*time.Millisecond), 10, 10)
+	if got := updateDarwinClickState(&state, true, start.Add(200*time.Millisecond), 13, 12); got != 2 {
+		t.Fatalf("nearby click count = %d, want 2", got)
+	}
+}
+
+func TestDarwinClickCountUsesPressTime(t *testing.T) {
+	var state darwinPointerButtonState
+	start := time.Unix(100, 0)
+	updateDarwinClickState(&state, true, start, 10, 10)
+	updateDarwinClickState(&state, false, start.Add(450*time.Millisecond), 10, 10)
+	if got := updateDarwinClickState(&state, true, start.Add(600*time.Millisecond), 10, 10); got != 1 {
+		t.Fatalf("late second click count = %d, want 1", got)
 	}
 }

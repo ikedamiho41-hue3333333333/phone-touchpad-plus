@@ -31,7 +31,9 @@ import {
 
 // [1 Touch, 2 Touches, 3 Touches] (as pixel)
 const TOUCH_MOVE_THRESHOLD = [10, 8, 15];
-// Max touch duration for a tap (as milliseconds)
+const TAP_MOVE_TOLERANCE = 18;
+const TAP_TIMEOUT = 450;
+// Delay before stationary touch movement begins moving the pointer (as milliseconds)
 const TOUCH_TIMEOUT = 250;
 // Hold duration before a one-finger movement becomes a drag (as milliseconds)
 const DRAG_HOLD_TIMEOUT = 350;
@@ -88,6 +90,7 @@ export default class Touchpad {
     #ongoingTouches = [];
     #dragging = false;
     #dragCandidate = false;
+    #tapCandidate = false;
     #gestureFingerCount = 0;
     #gestureStartCentroid = null;
     #gestureLastCentroid = null;
@@ -235,6 +238,7 @@ export default class Touchpad {
             this.#startTimeStamp = event.timeStamp;
             this.#moved = false;
             this.#dragCandidate = true;
+            this.#tapCandidate = true;
             this.#resetGestureState();
         }
         const touches = event.changedTouches;
@@ -260,6 +264,9 @@ export default class Touchpad {
         this.#lastEndTimeStamp = 0;
         if (this.#ongoingTouches.length != 1) {
             this.#dragCandidate = false;
+        }
+        if (this.#ongoingTouches.length > TOUCH_MOVE_THRESHOLD.length) {
+            this.#tapCandidate = false;
         }
         if (this.#ongoingTouches.length == 2) {
             this.#twoFingerStartCentroid = this.#centroid();
@@ -306,15 +313,17 @@ export default class Touchpad {
             if (this.#dragging) {
                 this.#dragging = false;
                 this.#moved = true;
+                this.#tapCandidate = false;
                 this.#inputController.pointerButton(POINTER_BUTTON_LEFT, false);
             }
             const handledMultiGesture = this.#gestureFingerCount >= 3 &&
                 (this.#multiGestureTriggered || this.#finishMultiGesture());
             if (handledMultiGesture) {
                 this.#moved = true;
+                this.#tapCandidate = false;
             }
-            if (!handledMultiGesture && !this.#moved &&
-                event.timeStamp - this.#startTimeStamp < TOUCH_TIMEOUT) {
+            if (!handledMultiGesture && this.#tapCandidate &&
+                event.timeStamp - this.#startTimeStamp < TAP_TIMEOUT) {
                 let button = 0;
                 if (this.#releasedCount == 1) {
                     button = POINTER_BUTTON_LEFT;
@@ -328,6 +337,7 @@ export default class Touchpad {
             }
             this.#releasedCount = 0;
             this.#dragCandidate = false;
+            this.#tapCandidate = false;
             this.#resetGestureState();
         }
     }
@@ -350,6 +360,9 @@ export default class Touchpad {
                 Math.pow(touches[i].pageX - this.#ongoingTouches[idx].pageXStart, 2) +
                 Math.pow(touches[i].pageY - this.#ongoingTouches[idx].pageYStart, 2)
             );
+            if (dist > TAP_MOVE_TOLERANCE) {
+                this.#tapCandidate = false;
+            }
             if (this.#dragCandidate && !canStartDrag &&
                 dist > TOUCH_MOVE_THRESHOLD[this.#ongoingTouches.length - 1]) {
                 this.#dragCandidate = false;
@@ -378,6 +391,7 @@ export default class Touchpad {
             this.#inputController.pointerButton(POINTER_BUTTON_LEFT, true);
             this.#dragging = true;
             this.#moved = true;
+            this.#tapCandidate = false;
         }
         this.#beginMultiGesture();
         if (this.#gestureFingerCount >= 3) {

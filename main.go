@@ -75,6 +75,13 @@ func controllerCapabilities(controller inputcontrol.Controller) capabilities {
 	return capabilities{Gestures: gestures}
 }
 
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r)
+	})
+}
+
 const (
 	commandKeyboardText            byte = 't'
 	commandKeyboardKey             byte = 'k'
@@ -296,7 +303,7 @@ func main() {
 	}
 	port := addr.Port
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.FS(webdataFS)))
+	mux.Handle("/", noStore(http.FileServer(http.FS(webdataFS))))
 	mux.Handle("/ws", websocket.Handler(func(ws *websocket.Conn) {
 		var message string
 		challenge := <-authenticationChallenges

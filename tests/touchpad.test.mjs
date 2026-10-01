@@ -66,6 +66,31 @@ test("single-finger tap releases the left button immediately", () => {
     ]);
 });
 
+test("a relaxed 400ms tap still clicks", () => {
+    const {buttons, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchend", [touch(1, 20, 20)], 400);
+
+    assert.deepEqual(buttons, [
+        {button: 0, press: true},
+        {button: 0, press: false},
+    ]);
+});
+
+test("small finger jitter still produces a tap", () => {
+    const {buttons, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchmove", [touch(1, 34, 20)], 100);
+    fire("touchend", [touch(1, 34, 20)], 150);
+
+    assert.deepEqual(buttons, [
+        {button: 0, press: true},
+        {button: 0, press: false},
+    ]);
+});
+
 test("holding before moving starts and finishes a drag", () => {
     const {buttons, fire, moves, touch} = createTouchpadHarness();
 

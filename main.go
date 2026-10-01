@@ -89,6 +89,7 @@ const (
 	commandPointerScrollFinished   byte = 'S'
 	commandPointerMove             byte = 'm'
 	commandPointerButton           byte = 'b'
+	commandPointerClickReset       byte = 'r'
 	commandGesture                 byte = 'g'
 )
 
@@ -166,6 +167,18 @@ func processCommand(controller inputcontrol.Controller, commandWithArg string) e
 			return errors.New("unsupported pointer button")
 		}
 		return controller.PointerButton(button, pressed != 0)
+	case commandPointerClickReset:
+		var button inputcontrol.PointerButton
+		if err := parseInts(arg, (*int)(&button)); err != nil {
+			return err
+		}
+		if button < 0 || button >= inputcontrol.PointerButtonLimit {
+			return errors.New("unsupported pointer button")
+		}
+		if resetter, ok := controller.(inputcontrol.PointerClickSequenceController); ok {
+			resetter.ResetPointerClickSequence(button)
+		}
+		return nil
 	default:
 		return errors.New("unsupported command")
 	}

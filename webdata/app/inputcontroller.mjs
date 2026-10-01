@@ -53,8 +53,10 @@ const COMMAND_POINTER_SCROLL_IN_PROGRESS = "s";
 const COMMAND_POINTER_SCROLL_FINISHED = "S";
 const COMMAND_POINTER_MOVE = "m";
 const COMMAND_POINTER_BUTTON = "b";
+const COMMAND_POINTER_CLICK_RESET = "r";
 const COMMAND_GESTURE = "g";
 const POINTER_CLICK_DURATION = 35;
+const POINTER_DOUBLE_CLICK_SECOND_PRESS_DELAY = 75;
 
 export default class InputController {
     #updateRate = 0;
@@ -134,8 +136,18 @@ export default class InputController {
     }
 
     pointerClick(button) {
+        this.#socket.send(`${COMMAND_POINTER_CLICK_RESET}${button}`);
         this.pointerButton(button, true);
         setTimeout(() => this.pointerButton(button, false), POINTER_CLICK_DURATION);
+    }
+
+    pointerDoubleClick(button) {
+        this.#socket.send(`${COMMAND_POINTER_CLICK_RESET}${button}`);
+        this.pointerButton(button, true);
+        setTimeout(() => this.pointerButton(button, false), POINTER_CLICK_DURATION);
+        setTimeout(() => this.pointerButton(button, true), POINTER_DOUBLE_CLICK_SECOND_PRESS_DELAY);
+        setTimeout(() => this.pointerButton(button, false),
+            POINTER_DOUBLE_CLICK_SECOND_PRESS_DELAY + POINTER_CLICK_DURATION);
     }
 
     keyboardKey(key) {

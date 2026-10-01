@@ -49,6 +49,7 @@ window.app = {
     key: inputController.keyboardKey.bind(inputController),
     text: inputController.keyboardText.bind(inputController),
     gesture: inputController.gesture.bind(inputController),
+    doubleClick: () => inputController.pointerDoubleClick(inputcontrollerModule.POINTER_BUTTON_LEFT),
     toggleFullscreen: ui.toggleFullscreen.bind(ui),
     showTextInput: ui.showTextInput.bind(ui),
     showKeys: ui.showKeys.bind(ui),

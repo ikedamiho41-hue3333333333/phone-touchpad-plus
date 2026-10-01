@@ -106,3 +106,7 @@ type Controller interface {
 type GestureController interface {
 	Gesture(action GestureAction) error
 }
+
+type PointerClickSequenceController interface {
+	ResetPointerClickSequence(button PointerButton)
+}

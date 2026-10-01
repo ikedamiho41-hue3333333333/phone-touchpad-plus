@@ -93,6 +93,23 @@ func TestDarwinClickCountStartsFreshAfterDoubleTap(t *testing.T) {
 	}
 }
 
+func TestDarwinResetPointerClickSequenceForcesNextTapToSingle(t *testing.T) {
+	controller := &darwinController{}
+	controller.pointerButtonState[PointerButtonLeft] = darwinPointerButtonState{
+		ClickCount: 1,
+		T:          time.Now(),
+		X:          10,
+		Y:          10,
+	}
+
+	controller.ResetPointerClickSequence(PointerButtonLeft)
+
+	state := controller.pointerButtonState[PointerButtonLeft]
+	if state != (darwinPointerButtonState{}) {
+		t.Fatalf("left click state = %#v, want zero state", state)
+	}
+}
+
 func TestDarwinClickCountDoesNotMergeSlowTaps(t *testing.T) {
 	var state darwinPointerButtonState
 	start := time.Unix(100, 0)

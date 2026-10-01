@@ -6,6 +6,7 @@
 * Add macOS mappings for application switching, Mission Control, Show Desktop, and application zoom.
 * Detect missing macOS Accessibility permission instead of silently dropping input events.
 * Respect the macOS double-click interval and prevent iPhone Safari from synthesizing competing mouse input.
+* Make touch-surface taps single-click only and provide an explicit double-click button.
 
 ## 0.1.0 (2026-09-29)
 

@@ -24,13 +24,14 @@
 <div id="pad" class="scene touch-input mouse-input keyboard-input allow-fullscreen">
     <div class="pad-copy">
         <p class="background">手机妙控板</p>
-        <p class="gesture-guide gesture-capability">轻点单击 · 按住后移动拖拽<br>双指滚动/捏合 · 三指或四指切换桌面</p>
+        <p class="gesture-guide gesture-capability">轻点始终单击 · 双击请点下方按钮<br>双指滚动/捏合 · 三指或四指切换桌面</p>
     </div>
     <div id="gesture-status" aria-live="polite"></div>
     <button class="top left" onclick="app.showKeys()">≡</button>
     <button class="bottom left visible-if-fullscreen-enabled" onclick="app.toggleFullscreen()">⤢</button>
     <button class="bottom right" onclick="app.showTextInput()">⌨</button>
     <div class="gesture-dock gesture-capability" aria-label="手势快捷操作">
+        <button class="gesture-button" onclick="app.doubleClick()" aria-label="双击">双击</button>
         <button class="gesture-button" onclick="app.gesture(app.GESTURE_APP_PREVIOUS)" aria-label="上一个桌面">◀</button>
         <button class="gesture-button" onclick="app.gesture(app.GESTURE_OVERVIEW)" aria-label="活动概览">⌃</button>
         <button class="gesture-button" onclick="app.gesture(app.GESTURE_SHOW_DESKTOP)" aria-label="显示桌面">⌄</button>

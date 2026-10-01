@@ -348,6 +348,12 @@ func (p *darwinController) PointerButton(button PointerButton, press bool) error
 	return nil
 }
 
+func (p *darwinController) ResetPointerClickSequence(button PointerButton) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.pointerButtonState[button] = darwinPointerButtonState{}
+}
+
 func (p *darwinController) PointerMove(deltaX, deltaY int) error {
 	location, err := p.mouseLocation()
 	if err != nil {

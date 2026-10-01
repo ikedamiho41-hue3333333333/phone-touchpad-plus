@@ -86,6 +86,38 @@ test("small finger jitter still produces a tap", () => {
     assert.deepEqual(clicks, [0]);
 });
 
+test("two sequential one-finger taps stay as two left clicks", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchend", [touch(1, 20, 20)], 80);
+    fire("touchstart", [touch(2, 20, 20)], 160);
+    fire("touchend", [touch(2, 20, 20)], 240);
+
+    assert.deepEqual(clicks, [0, 0]);
+});
+
+test("brief accidental second-finger contact does not open a context menu", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchstart", [touch(2, 40, 20)], 80);
+    fire("touchend", [touch(2, 40, 20)], 90);
+    fire("touchend", [touch(1, 20, 20)], 100);
+
+    assert.deepEqual(clicks, []);
+});
+
+test("deliberate two-finger tap still requests a right click", () => {
+    const {clicks, fire, touch} = createTouchpadHarness();
+
+    fire("touchstart", [touch(1, 20, 20)], 0);
+    fire("touchstart", [touch(2, 40, 20)], 20);
+    fire("touchend", [touch(1, 20, 20), touch(2, 40, 20)], 100);
+
+    assert.deepEqual(clicks, [1]);
+});
+
 test("holding before moving starts and finishes a drag", () => {
     const {buttons, fire, moves, touch} = createTouchpadHarness();
 

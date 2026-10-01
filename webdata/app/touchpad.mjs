@@ -33,6 +33,8 @@ import {
 const TOUCH_MOVE_THRESHOLD = [10, 8, 15];
 const TAP_MOVE_TOLERANCE = 18;
 const TAP_TIMEOUT = 450;
+const SECONDARY_CLICK_JOIN_TIMEOUT = 120;
+const SECONDARY_CLICK_MIN_OVERLAP = 40;
 // Delay before stationary touch movement begins moving the pointer (as milliseconds)
 const TOUCH_TIMEOUT = 250;
 // Hold duration before a one-finger movement becomes a drag (as milliseconds)
@@ -91,6 +93,9 @@ export default class Touchpad {
     #dragging = false;
     #dragCandidate = false;
     #tapCandidate = false;
+    #secondaryClickCandidate = false;
+    #secondaryClickConfirmed = false;
+    #secondaryClickOverlapStart = 0;
     #gestureFingerCount = 0;
     #gestureStartCentroid = null;
     #gestureLastCentroid = null;
@@ -239,6 +244,9 @@ export default class Touchpad {
             this.#moved = false;
             this.#dragCandidate = true;
             this.#tapCandidate = true;
+            this.#secondaryClickCandidate = false;
+            this.#secondaryClickConfirmed = false;
+            this.#secondaryClickOverlapStart = 0;
             this.#resetGestureState();
         }
         const touches = event.changedTouches;
@@ -269,9 +277,14 @@ export default class Touchpad {
             this.#tapCandidate = false;
         }
         if (this.#ongoingTouches.length == 2) {
+            this.#secondaryClickCandidate =
+                event.timeStamp - this.#startTimeStamp <= SECONDARY_CLICK_JOIN_TIMEOUT;
+            this.#secondaryClickOverlapStart = event.timeStamp;
             this.#twoFingerStartCentroid = this.#centroid();
             this.#pinchStartDistance = this.#twoFingerDistance();
             this.#pinchLastDistance = this.#pinchStartDistance;
+        } else if (this.#ongoingTouches.length > 2) {
+            this.#secondaryClickCandidate = false;
         }
         this.#beginMultiGesture();
         this.#inputController.pointerScroll(0, 0, true);
@@ -291,6 +304,10 @@ export default class Touchpad {
         }
         if (this.#gestureFingerCount >= 3) {
             this.#gestureLastCentroid = this.#centroid();
+        }
+        if (this.#ongoingTouches.length == 2 && this.#secondaryClickCandidate &&
+            event.timeStamp - this.#secondaryClickOverlapStart >= SECONDARY_CLICK_MIN_OVERLAP) {
+            this.#secondaryClickConfirmed = true;
         }
         for (let i = 0; i < touches.length; i += 1) {
             const idx = this.#ongoingTouchIndexById(touches[i].identifier);
@@ -324,21 +341,23 @@ export default class Touchpad {
             }
             if (!handledMultiGesture && this.#tapCandidate &&
                 event.timeStamp - this.#startTimeStamp < TAP_TIMEOUT) {
-                let button = 0;
+                let button = null;
                 if (this.#releasedCount == 1) {
                     button = POINTER_BUTTON_LEFT;
-                } else if (this.#releasedCount == 2) {
+                } else if (this.#releasedCount == 2 && this.#secondaryClickConfirmed) {
                     button = POINTER_BUTTON_RIGHT;
                 } else if (this.#releasedCount == 3) {
                     button = POINTER_BUTTON_MIDDLE;
                 }
-                this.#inputController.pointerClick(button);
-                if (button == POINTER_BUTTON_LEFT) {
-                    this.#feedback("单击");
-                } else if (button == POINTER_BUTTON_RIGHT) {
-                    this.#feedback("右键");
-                } else if (button == POINTER_BUTTON_MIDDLE) {
-                    this.#feedback("中键");
+                if (button != null) {
+                    this.#inputController.pointerClick(button);
+                    if (button == POINTER_BUTTON_LEFT) {
+                        this.#feedback("单击");
+                    } else if (button == POINTER_BUTTON_RIGHT) {
+                        this.#feedback("右键");
+                    } else if (button == POINTER_BUTTON_MIDDLE) {
+                        this.#feedback("中键");
+                    }
                 }
             }
             this.#releasedCount = 0;
